@@ -1,0 +1,95 @@
+---
+title: "CeMoRe Field Summary"
+author: "EK"
+date: "1/27/2023"
+output: 
+  word_document: 
+    fig_caption: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      collapse = TRUE,
+                      warning = FALSE,
+                      message = FALSE)
+knitr::opts_chunk$set(fig.width=18)
+
+source("../R/0 Setup.R")
+
+knitr::knit_hooks$set(inline=
+                        function(x){
+                          if(!is.numeric(x)){x
+                          }else{prettyNum(round(x,2),
+                                         big.mark=",")}})
+knitr::knit_hooks$set(inline=
+                        function(x){
+                          if(!is.numeric(x)){x
+                          }else{ifelse(x<10,as.character(english::as.english(x)),x)}})
+
+```
+
+```{r load_data, include = F}
+effort <- load_effort(year, month, single=T)
+effort_lines <- get_effort_lines(effort)
+ap_sf <- load_sightings(year, month, single=T)
+
+# all_effort <- load_effort(year, month, single=F, vessel = "MB")
+# all_effort_lines <- readRDS(paste0("../output/all_lines/all_effort_lines_to_", year,"_", month, ".rds")) %>%
+#   mutate(length_km = as.numeric(st_length(geometry))/1000)
+# all_ap_sf <- readRDS(paste0("../output/all_sgt/all_effort_sgt_to_", year,"_",month, ".rds"))
+
+
+summary <- survey_summary()
+s <- summary[[1]]
+sp <- summary[[2]]
+dates <- summary[[4]]
+# summary_all <- survey_summary(single=F)
+
+survey <- paste(month.name[dates[1,]$start_month], year)
+firstday <- dates$firstday
+lastday <- dates$lastday
+```
+# `r survey`
+This report provides a summary of the Cetacean Research Program’s field efforts to meet commitments under TMX Recommendations 5/6 `r firstday` to `r lastday`, `r year`.
+
+## Field program overview
+In order to meet DFO’s commitments under TMX Recommendations 5 and 6, the Cetacean Research Program has assembled a dedicated team for Cetacean Monitoring and Research (CeMoRe) in the southern Salish Sea. Fieldwork is focused on better understanding the abundance, distribution, and behaviour of cetaceans in the TMX project area. Field objectives include line-transect surveys, deployment of acoustic recorders, deployment of data-logging tags on humpback whales, and collection of genetic and photo-identification data from humpback whales. 
+
+Line-transect surveys are being conducted monthly (weather permitting) in the TMX project area from Vancouver to Swiftsure Bank (since July 2020). These surveys are required to describe the seasonal distribution and estimate the abundance of cetaceans, and to address identified data gaps with respect to vessel strike risk for these species.
+
+Acoustic recorders are being deployed to record the high-frequency clicks produced by porpoises. The acoustic data supplements boat-based surveys by providing insight into habitat use of porpoises that cannot be gained from visual surveys (i.e. how use of various water depths and habitat types may vary between day and night) and implications for vessel-related impacts on these species. Acoustic recorders are deployed systematically throughout the project area and data are downloaded from each recorder at least once every three months. 
+
+Collaborative humpback whale tagging efforts are being conducted with researchers from Cascadia Research Collective (CRC) and Stanford University. Data from these tags provide insight into humpback whale dive behaviour in and around shipping lanes and how this behaviour influences their vulnerability to vessel strikes, including during nighttime hours and weather conditions in which visual surveys are not possible. 
+
+Photo-identification and genetic data from humpback whales are being collected to inform population structure and movements of humpback whales in Canadian Pacific waters, and therefore the proportion of the North Pacific humpback whale population that is impacted by vessel strike risk in the project area. 
+
+*The CeMoRe team’s next field effort is planned for January 11-25, 2022, aboard the CCG vessel Tanu on the Central Coast including a line-transect survey and photo-identification and genetic sampling of humpback whales.*
+\newpage
+
+<!-- During the recent field effort, the team was able to deploy tags on whales in the inside waters of Juan de Fuca, as well as in the more open waters on and around Swiftsure Bank (Figure 3). Data collected from these tags can therefore contribute to regional comparison of humpback whale movements and dive behaviour within the overall project area.   -->
+### `r survey` field work summary
+Field work focused on `r surveys[which(surveys$year == year & surveys$month_abb == month_abb),]$objectives %>% tolower()`. The survey included `r length(unique(effort$TransectID))` transects (`r round(sum(st_length(effort_lines))/1000,0) %>% units::set_units(NULL)` km) over `r length(unique(day(effort$GpsT)))` days of `r dates$field_days` total field days (Figure 1, Table 1). 
+<!-- *fix this messy sentence* The completed transect lines resulted in `r nrow(ap_sf)` sightings of `r sum(ap_sf$Group_Size)` individual cetaceans (Table 1, Figure 1). This was comprised of `r ap_sf %>% filter(Species %like% "hump") %>% nrow()` sightings of humpback whales (`r sum(ap_sf[which(ap_sf$Species %like% "hump"),]$Group_Size)` individuals), `r ap_sf %>% filter(Species %like% "harbour") %>% nrow()` sightings of harbour porpoise (`r sum(ap_sf[which(ap_sf$Species %like% "harbour"),]$Group_Size)` individuals), `r ap_sf %>% filter(Species %like% "Dall") %>% nrow()` sightings of Dall’s porpoise (`r sum(ap_sf[which(ap_sf$Species %like% "Dall"),]$Group_Size)` individuals), and `r ap_sf %>% filter(Species %like% "kill") %>% nrow()` sighting of killer whales of unknown ecotype (`r sum(ap_sf[which(ap_sf$Species %like% "kill"),]$Group_Size)` individuals).  -->
+
+```{r sgt-tbl} 
+sgt_tbl <- sp %>% as.data.frame() %>%  dplyr::select(-SurveyID) %>% rename("Number of sightings" = number_sightings, "Total number of individuals" = number_individuals)
+
+sgt_tbl_cp <- "Table 1: Species sightings for the CeMoRe July 2022 survey."
+
+csasdown::csas_table(sgt_tbl,longtable = F,  escape = FALSE, font_size=9,  align=c("l","r","r"), caption =sgt_tbl_cp)
+```
+
+```{r prep-plot,results='hide'}
+survey_map_file <- paste0("C:/Users/keppele/Documents/CeMoRe/Analysis/cemore_analysis/output_maps/summary_map_", survey_title, ".png")
+
+if(!file.exists(survey_map_file)){
+  p <- plot_survey(single_survey=T,Save=T, incidentals=F, hydrophone=F)
+  knitr::plot_crop(survey_map_file)
+}
+```
+
+```{r survey-plot, fig.cap=paste("\\label{fig:plot}Figure 1. Cetacean line-transect survey effort", firstday, "to", lastday, year, "including all on-effort and incidental sightings.")}
+#  Acoustic recorder deployment locations are shown as asterisks.
+knitr::include_graphics(paste0("C:/Users/keppele/Documents/CeMoRe/Analysis/cemore_analysis/output_maps/summary_map_",survey_title,".png"))
+```
+<!-- In addition to the survey, one acoustic recorder was deployed in eastern Juan de Fuca Strait near Whirl Bay, and two previously deployed recorders were recovered. -->

@@ -1,0 +1,484 @@
+---
+title: "CeMoRe Survey Data Summary"
+author: "Elise Keppel"
+date: "`r Sys.Date()`"
+output: pdf_document
+filename: "All_surveys_summary2"
+---
+`r Sys.Date()`
+```{r setup, include=FALSE, message = FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = F)
+source("../R/0 Setup.R")
+
+```
+\begin{center} 
+
+Summary of survey data up to `r month_abb` `r year`
+
+
+
+\end{center}
+
+
+
+
+
+
+```{r load spatial files, results = FALSE}
+# ----------------- LOAD SPATIAL FILES --------------------------------
+# bc coast for plotting
+ x <- "C:/Users/KeppelE/Documents/CeMoRe/Analysis/cemore_analysis/shapefiles"
+if(!exists("coast")){
+coast <- sf::st_read(dsn = x, layer = "BC_coast_UTM9")
+}
+
+if(!exists("canada_shp")){
+canada_shp <- st_read(dsn = x, "CanadianEEZ") %>%
+  st_transform(crs = 4326)
+}
+if(!exists("d")){
+d <- st_read(dsn = x, layer = "less_than_5m") %>% st_transform(crs = 4326)
+}
+coord <- ggplot2::coord_sf(xlim = c(-125.5, -123), ylim = c(48.1, 49.5), crs = sf::st_crs(4326)) 
+
+# create bathymetric layer
+bathy <- marmap::getNOAA.bathy(-125.5, -122.5,48.1, 49.5,res=1) %>% 
+  fortify(bathy) 
+bathy$z[which(bathy$z >= 0)] <- 0
+col <- rev(RColorBrewer::brewer.pal(9L, "Blues")[4:7])
+col_ramp <- colorRampPalette(col)
+
+coast_file <- coast
+g <- ggplot() + 
+  geom_raster(aes(x=x,y=y,fill = z), data = bathy) +  labs(fill = "Depth (m)") +
+  scale_fill_gradientn(colours = col_ramp(20)) +
+  ggnewscale::new_scale("fill") +
+  # geom_contour(data = b, 
+  #              aes(x=X, y=Y, z=PID),
+  #              breaks=c(-250),
+  #              size=c(0.6),
+  #              colour="grey")+
+  geom_sf(data = coast_file, stroke = 0.05, fill = "light yellow", colour = "grey 60")+
+  geom_sf(data = canada_shp, colour = "red", fill = NA, linetype = "solid") 
+```
+
+
+
+```{r load survey data, results = FALSE}
+single <- F
+all_effort <- cemore::load_effort(2022, "01", FALSE)
+# all_effort_list <- all_effort %>% split(all_effort$SurveyID)
+# all_effort_lines <- map_df(all_effort_list, get_effort_lines)
+all_effort_lines <- get_effort_lines(all_effort)
+
+all_ap_sf <- load_sightings(year, as.numeric(month), single)
+all_ap_sf%<>% arrange(year, month) 
+lev <- unique(all_ap_sf$SurveyID )
+all_ap_sf$SurveyID %<>% factor(levels = lev)
+all_ap_sf$season %<>% factor(levels = c("Winter", "Spring", "Summer", "Fall"))
+```
+
+```{r }
+g +
+  geom_sf(data = all_effort_lines, colour = "black") +
+  # geom_sf(data = transects, aes(colour = ?)) +
+  ggtitle("All completed CeMoRe survey effort", subtitle = paste("Sep 2020 -", month_abb, year)) +
+  coord #+
+  # facet_wrap( ~ season, drop = F)
+```
+Total distance surveyed = `r round(sum(st_length(all_effort_lines))/1000) %>% as.numeric()` km
+
+## Survey Effort
+```{r summarise survey distance}
+
+# l <- all_effort_lines %>% mutate(length = st_length(geometry)) %>%
+#   group_by(Year = year, Month = factor(month.abb[month], levels = month.abb[1:12])) %>% 
+#   summarise(total_survey_length_km = sum(length/1000))
+# sum(st_length(all_effort_lines))
+
+x <- all_effort_lines %>% mutate(length = st_length(geometry))
+y <- x %>% as.data.frame() %>% filter(!is.na(length)) %>% 
+  # transmute(Year = year, Month= month_abb, length = as.numeric(length)) %>%
+  transmute(Year = year, Season = season, length = as.numeric(length)) %>%
+  # group_by(Year, Month) %>% 
+  group_by(Season) %>% 
+  summarise("Total survey length (km)" = round(sum(length/1000)))
+# total number of survey days and total count cetacean sightings; days on effort per survey
+e1 <- all_effort %>% filter(Status == "ON") %>% rename(Season = season) %>% 
+  dplyr::group_by(
+    # Year = year(GpsT), 
+    # Month = factor(month.abb[month(GpsT)], levels = month.abb[1:12])) %>% 
+    Season) %>% 
+  dplyr::summarise("# days on effort" = n_distinct(day(GpsT)), "# transects" = n_distinct(Final.T.ID))
+e2 <- plyr::join(y, e1)
+e2 %>% kableExtra::kable()
+
+# TO DO : still working on grouping by season instead of year, month
+```
+## Survey Sightings
+```{r summarise survey data, results = F}
+# s1 <- all_ap_sf %>% dplyr::group_by(Year = year(time_index), Month = factor(month.abb[month(time_index)], levels = month.abb[1:12])) %>%
+#   dplyr::summarise(" field_days" = (max(day(time_index)) - min(day(time_index)) + 1),  
+#                    "# transects" = (n_distinct(TransectID)),
+#                    "# sightings" = n(), 
+#                    "# individuals" = sum(BestNumber))
+# s2 <- all_ap_sf %>%  dplyr::group_by(Species, season, year) %>%
+#   dplyr::summarise("# sightings" = n(), "# individuals" = sum(BestNumber))
+
+# counts by species in each survey
+# s2 <- all_ap_sf %>%  dplyr::group_by(year, month, Species) %>%
+#   dplyr::summarise(number_sightings = n(), number_indivduals = sum(BestNumber))
+
+# counts by species in all surveys
+s3 <- all_ap_sf %>%  dplyr::group_by(Species) %>%
+  dplyr::summarise( "# sightings" = n(), "# individuals" = sum(BestNumber), "Mean grp size" = round(mean(BestNumber), 1))
+
+# s5 <- all_ap_sf %>% as.data.frame() %>% dplyr::group_by(Species, Year = year(time_index), Month = factor(month.abb[month(time_index)], levels = month.abb[1:12]), season) %>%
+#   dplyr::summarise(sgt = as.numeric(n()), indivs = as.numeric(sum(BestNumber))) %>% as.data.frame()
+# 
+# s6 <- plyr::join(y, s5, by=c("Year", "Month")) %>% 
+#   group_by(Species, Season = season, Year) %>% 
+#   summarise(sgt = sum(sgt), indivs = sum(indivs), total_survey_length_km = sum(total_survey_length_km),
+#             sgt_per_100_km_effort = round(sgt/total_survey_length_km*100)) %>% 
+#   dplyr::transmute(Species, Year, Season, sgt, indivs, 
+#                    srv_km = total_survey_length_km, sgt_per_100_km_effort) %>%
+#   ungroup() %>% as.data.frame() %>% 
+#   mutate(sgt_p_100k_eff = if_else(
+#     sgt_per_100_km_effort < 1, "< 1",
+#     as.character(sgt_per_100_km_effort))) %>% dplyr::select(-sgt_per_100_km_effort) %>% 
+# arrange(Species, Season, Year)
+```
+
+
+```{r survey summary}
+# s1 %>% as.data.frame() %>% dplyr::select(-geometry) %>% kableExtra::kable()
+s3 %>% as.data.frame() %>% dplyr::select(-geometry) %>% kableExtra::kable()
+# s6 %>% kableExtra::kable()
+
+```
+
+
+
+
+*Note: 
+
+
+*Winter = Jan - Mar*
+
+*Spring = Apr - Jun*
+
+*Summer = Jul - Sep*
+
+*Fall   = Oct - Dec* 
+
+
+## Beaufort conditions
+```{r plot_beaufort_conditions}
+all_effort_lines_sum <- all_effort_lines %>% mutate(length_km = as.numeric(st_length(geometry))/1000) %>% 
+  as.data.frame() %>% mutate(Bf = factor(Bf, levels = c(0,1,2,3,4,5)))
+suppressMessages(ggplot()) +
+  geom_boxplot(data = all_effort_lines_sum, aes(Bf, length_km)) #+
+
+col_bf <- rev(RColorBrewer::brewer.pal(11L, "Spectral")[2:11])
+col_ramp_bf <- colorRampPalette(col_bf)
+ggplot() +
+  geom_sf(data = coast, stroke = 0.05, fill = "light yellow", colour = "grey 60")+
+  geom_sf(data = all_effort_lines, stroke = 2, aes(colour = factor(Bf))) +
+  scale_colour_manual('Beaufort', values = col_ramp_bf(6)) +
+    coord
+# + facet_wrap(~factor(season, levels = c("Winter", "Spring", "Summer", "Fall")))
+```
+```{r hw, echo=FALSE}
+all_ap_sf %<>% mutate(Count =case_when(
+  BestNumber == 1 ~ "1",
+  BestNumber %in% c(2:5) ~ "2:5",
+  BestNumber >5 ~ ">5"
+) %>% factor(levels = c("1", "2:5", ">5")))
+
+sp <- "Humpback"
+ap_sf <- all_ap_sf %>% filter(Species %like% sp)
+ap_sf$Species %<>% droplevels()
+# to order legend symbols consistently
+sp <- unique(c(levels(ap_sf$Species)))
+
+base_map <- ggplot() +
+  geom_raster(aes(x=x,y=y,fill = z), data = bathy) +  labs(fill = "Depth (m)") +
+  scale_fill_gradientn(colours = col_ramp(20), guide = "none") +
+  ggnewscale::new_scale("fill") +
+  geom_sf(data = coast, stroke = 0.05, fill = "light yellow", colour = "grey 60") +
+  guides(alpha= "none") +
+  ylab("")+xlab("") + 
+  theme(axis.text.x = element_text(angle = 90))
+
+#-----------------------------------------------------------
+# make bathy legend
+b_leg <- ggplot() +
+  geom_raster(aes(x=x,y=y,fill = z), data = bathy) +  labs(fill = "Depth (m)") +
+  scale_fill_gradientn(colours = col_ramp(20)) +
+  theme(legend.position = "bottom") +
+  guides(fill = guide_colorbar(title.position = "left"))
+# leg1 <- gtable_filter(ggplot_gtable(ggplot_build(b_leg)), "guide-box") 
+# leg1Grob <- grobTree(leg1)
+leg1 <- cowplot::get_legend(b_leg)
+#-----------------------------------------------------------
+
+hw <- base_map +
+  geom_sf(data = all_effort_lines, stroke = 0.25, aes(colour = factor(year)))+
+  scale_colour_manual(name = "Effort in year", values = c("pink", "grey 40")) +
+  ggnewscale::new_scale_colour()+
+  geom_sf(data = ap_sf, stroke = 0.01, alpha = 0.5, aes(colour = factor(year), size = Count)) +#
+  scale_colour_manual("Sightings in year", values = c("red", "black")) +
+  scale_size_manual(values = c(1.5,2,3), name = "Number of Individuals") +
+  coord 
+   # facet_wrap(~month_abb, drop = F)
+  # annotation_custom(leg1Grob, xmin=-124.5, xmax=-124.95, ymin=47.9, ymax=48.1) +
+```
+# Humpback Summary (N = `r nrow(ap_sf)`)
+```{r hw_sgt-season}
+hw +
+  ggtitle(paste0("CeMoRe seasonal ", sp, " sightings")) +
+  facet_wrap(~factor(season, levels = c("Winter", "Spring", "Summer", "Fall")), drop = F) #+
+    # annotation_custom(leg1, xmin=-124.8, xmax=-124.95, ymin=47.9, ymax=48.1) 
+```
+```{r hw-sgt-month}
+hw +
+ ggtitle(paste0("CeMoRe monthly ", sp, " sightings")) +
+ facet_wrap(~month_abb, drop = F) #+
+    # annotation_custom(leg1, xmin=-124.8, xmax=-124.95, ymin=47.9, ymax=48.1) +
+
+
+
+```
+
+```{r hw-hist}
+source("R/3 dist_hist.R")
+bins = 40
+ap_sf2 <- ap_sf %>% as.data.frame()
+plot_hist(ap_sf2, sp, F, n_bins = bins) + ggtitle(label = "Humpback sighting distance histograms")# + xlim(0,1)
+# 
+# bins = 10
+# plot_hist(all_ap_sf, sp, F, n_bins = bins) + ggtitle(label = "All HW sightings")
+
+# plot_hist(all_ap_sf, sp, T, n_bins = 10) + ggtitle(label = "All HW sightings")
+```
+```{r oct-hw-sgt}
+oct_hW <- ap_sf %>% filter(month == 10)
+oct_lines <- all_effort_lines %>% filter(month == 10)
+
+# # to size symbols by count
+# oct_hp <- oct_hp %>% mutate(Count =case_when(
+#   BestNumber == 1 ~ "1",
+#   BestNumber %in% c(2:5) ~ "2:5",
+#   BestNumber >5 ~ ">5"
+# ) %>% factor(levels = c("1", "2:5", ">5")))
+
+# coord <- ggplot2::coord_sf(xlim = c(-125.4, -123), ylim = c(48.2, 49.44), crs = sf::st_crs(4326)) 
+
+base_map + 
+  geom_sf(data = oct_lines, stroke = 0.25, colour = "grey 40")+
+  geom_sf(data = oct_hW, stroke = 0.01, alpha = 0.5, aes(size = Count)) +#
+  scale_size_manual(values = c(1.5,2,3)) +
+  ggtitle(paste0("CeMoRe survey ", sp, " sightings Oct 2020 vs Oct 2021 ")) +
+  # annotation_custom(leg1Grob, xmin=-124.8, xmax=-124.95, ymin=47.9, ymax=48.1) +
+  coord +
+  facet_wrap(~year, drop = F)
+
+```
+2020 N = `r ap_sf %>% filter(month == 10 & year == 2020) %>% nrow()`, 2021 N = `r ap_sf %>% filter(month == 10 & year == 2021) %>% nrow()`
+
+```{r hp, echo=FALSE}
+all_ap_sf %<>% mutate(Count =case_when(
+  BestNumber == 1 ~ "1",
+  BestNumber %in% c(2:5) ~ "2:5",
+  BestNumber >5 ~ ">5"
+) %>% factor(levels = c("1", "2:5", ">5")))
+# 
+# # make bathy legend
+# b_leg <- ggplot() +
+#   geom_raster(aes(x=x,y=y,fill = z), data = bathy) +  labs(fill = "Depth (m)") +
+#   scale_fill_gradientn(colours = col_ramp(20)) +
+#   theme(legend.position = "bottom") +
+#   guides(fill = guide_colorbar(title.position = "left", vjust = 10))
+# leg1 <- gtable_filter(ggplot_gtable(ggplot_build(b_leg)), "guide-box") 
+# leg1Grob <- grobTree(leg1)
+
+sp <- "Harbour"
+ap_sf <- all_ap_sf %>% filter(Species %like% sp)
+ap_sf$Species %<>% droplevels()
+# to order legend symbols consistently
+sp <- unique(c(levels(ap_sf$Species)))
+
+# base_map <- ggplot() +
+#   geom_raster(aes(x=x,y=y,fill = z), data = bathy) +  labs(fill = "Depth (m)") +
+#   scale_fill_gradientn(colours = col_ramp(20)) +
+#   ggnewscale::new_scale("fill") +
+#   geom_sf(data = coast, stroke = 0.05, fill = "light yellow", colour = "grey 60") +
+#   guides(alpha= "none") +
+#   ylab("")+xlab("") + 
+#   theme(axis.text.x = element_text(angle = 90))
+
+
+hp <- base_map +
+  geom_sf(data = all_effort_lines, stroke = 0.25, aes(colour = factor(year)))+
+  scale_colour_manual(name = "Effort in year", values = c("pink", "grey 40")) +
+  ggnewscale::new_scale_colour()+
+  geom_sf(data = ap_sf, stroke = 0.01, alpha = 0.5, aes(colour = factor(year), size = Count)) +#
+  scale_colour_manual("Sightings in year", values = c("red", "black")) +
+  scale_size_manual(values = c(1.5,2,3), name = "Number of Individuals") +
+  coord 
+   # facet_wrap(~month_abb, drop = F)
+  # annotation_custom(leg1Grob, xmin=-124.5, xmax=-124.95, ymin=47.9, ymax=48.1) +
+```
+# Harbour Porpoise Summary (N = `r nrow(ap_sf)`)
+```{r hp-sgt-season}
+hp +
+  ggtitle(paste0("CeMoRe seasonal ", sp, " sightings")) +
+  facet_wrap(~factor(season, levels = c("Winter", "Spring", "Summer", "Fall")), drop = F)
+```
+```{r hp-sgt-by-month}
+hp +
+ ggtitle(paste0("CeMoRe monthly ", sp, " sightings")) +
+ facet_wrap(~month_abb, drop = F)
+
+```
+
+
+```{r hp-hist}
+source("R/3 dist_hist.R")
+bins = 40
+plot_hist(all_ap_sf, sp, F, n_bins = bins) + ggtitle(label = "Harbour Porpoise sighting distance histogram")
+
+# bins = 10
+# plot_hist(all_ap_sf, sp, F, n_bins = bins) + ggtitle(label = "All HP sightings")
+
+# plot_hist(all_ap_sf, sp, T, n_bins = 10) + ggtitle(label = "All HP sightings")
+```
+```{r oct-hp-sgt}
+oct_hp <- ap_sf %>% filter(month == 10)
+oct_lines <- all_effort_lines %>% filter(month == 10)
+
+# to size symbols by count
+oct_hp <- oct_hp %>% mutate(Count =case_when(
+  BestNumber == 1 ~ "1",
+  BestNumber %in% c(2:5) ~ "2:5",
+  BestNumber >5 ~ ">5"
+) %>% factor(levels = c("1", "2:5", ">5")))
+
+# coord <- ggplot2::coord_sf(xlim = c(-125.4, -123), ylim = c(48.2, 49.44), crs = sf::st_crs(4326)) 
+
+base_map + 
+  geom_sf(data = oct_lines, stroke = 0.25, colour = "grey 40")+
+  geom_sf(data = oct_hp, stroke = 0.01, alpha = 0.5, aes(size = Count)) +#
+  scale_size_manual(values = c(1.5,2,3)) +
+  ggtitle(paste0("CeMoRe survey ", sp, " sightings Oct 2020 vs Oct 2021 ")) +
+  # annotation_custom(leg1Grob, xmin=-124.8, xmax=-124.95, ymin=47.9, ymax=48.1) +
+  coord +
+  facet_wrap(~year, drop = F)
+
+```
+2020 N = `r ap_sf %>% filter(month == 10 & year == 2020) %>% nrow()`, 
+2021 N = `r ap_sf %>% filter(month == 10 & year == 2021) %>% nrow()`
+
+```{r dp, echo=FALSE}
+all_ap_sf %<>% mutate(Count =case_when(
+  BestNumber == 1 ~ "1",
+  BestNumber %in% c(2:5) ~ "2:5",
+  BestNumber >5 ~ ">5"
+) %>% factor(levels = c("1", "2:5", ">5")))
+
+sp <- "Dalls Porpoise"
+ap_sf <- all_ap_sf %>% filter(Species %like% sp)
+ap_sf$Species %<>% droplevels()
+# to order legend symbols consistently
+sp <- unique(c(levels(ap_sf$Species)))
+# 
+# base_map <- ggplot() +
+#   geom_raster(aes(x=x,y=y,fill = z), data = bathy) +  labs(fill = "Depth (m)") +
+#   scale_fill_gradientn(colours = col_ramp(20)) +
+#   ggnewscale::new_scale("fill") +
+#   geom_sf(data = coast, stroke = 0.05, fill = "light yellow", colour = "grey 60") +
+#   guides(alpha= "none") +
+#   ylab("")+xlab("") + 
+#   theme(axis.text.x = element_text(angle = 90))
+
+
+dp <- base_map +
+  geom_sf(data = all_effort_lines, stroke = 0.25, aes(colour = factor(year)))+
+  scale_colour_manual(name = "Effort in year", values = c("pink", "grey 40")) +
+  ggnewscale::new_scale_colour()+
+  geom_sf(data = ap_sf, stroke = 0.01, alpha = 0.5, aes(colour = factor(year), size = Count)) +#
+  scale_colour_manual("Sightings in year", values = c("red", "black")) +
+  scale_size_manual(values = c(1.5,2,3), name = "Number of Individuals") +
+  coord 
+   # facet_wrap(~month_abb, drop = F)
+  # annotation_custom(leg1Grob, xmin=-124.5, xmax=-124.95, ymin=47.9, ymax=48.1) +
+```
+# Dalls Porpoise Summary (N = `r nrow(ap_sf)`)
+```{r dp-sgt}
+dp +
+  ggtitle(paste0("CeMoRe seasonal ", sp, " sightings")) +
+  facet_wrap(~factor(season, levels = c("Winter", "Spring", "Summer", "Fall")), drop = F)
+dp +
+ ggtitle(paste0("CeMoRe monthly ", sp, " sightings")) +
+ facet_wrap(~month_abb, drop = F)
+
+
+```
+
+
+```{r dp-hist}
+source("R/3 dist_hist.R")
+bins = 40
+plot_hist(all_ap_sf, sp, F, n_bins = bins) + ggtitle(label = "Dalls Porpoise sighting distance histogram") +  scale_x_continuous(limits = c(NA,1.26))
+
+
+# bins = 10
+# plot_hist(all_ap_sf, sp, F, n_bins = bins) + ggtitle(label = "All HW sightings")
+# 
+# plot_hist(all_ap_sf, sp, T, n_bins = 10) + ggtitle(label = "All HW sightings")
+
+```
+```{r oct-dp-sgt}
+oct_dp <- ap_sf %>% filter(month == 10)
+oct_lines <- all_effort_lines %>% filter(month == 10)
+
+# # to size symbols by count
+# oct_hp <- oct_hp %>% mutate(Count =case_when(
+#   BestNumber == 1 ~ "1",
+#   BestNumber %in% c(2:5) ~ "2:5",
+#   BestNumber >5 ~ ">5"
+# ) %>% factor(levels = c("1", "2:5", ">5")))
+
+# coord <- ggplot2::coord_sf(xlim = c(-125.4, -123), ylim = c(48.2, 49.44), crs = sf::st_crs(4326)) 
+
+base_map + 
+  geom_sf(data = oct_lines, stroke = 0.25, colour = "grey 40")+
+  geom_sf(data = oct_dp, stroke = 0.01, alpha = 0.5, aes(size = Count)) +#
+  scale_size_manual(values = c(1.5,2,3)) +
+  ggtitle(paste0("CeMoRe survey ", sp, " sightings Oct 2020 vs Oct 2021 ")) +
+  # annotation_custom(leg1Grob, xmin=-124.8, xmax=-124.95, ymin=47.9, ymax=48.1) +
+  coord +
+  facet_wrap(~year, drop = F)
+
+```
+2020 N = `r ap_sf %>% filter(month == 10 & year == 2020) %>% nrow()`, 2021 N = `r ap_sf %>% filter(month == 10 & year == 2021) %>% nrow()`
+
+\newpage
+# Killer Whales
+
+*Note: There have not been enough KW sightings to begin working with detections functions yet*
+```{r kw-exploration}
+sp <- "KW"
+ap_sf <- all_ap_sf %>% filter(Species %like% sp)
+  ap_sf$Species <- "KW"
+
+# ap_sf$Species %<>% droplevels()
+# to order legend symbols consistently
+sp <- unique(c(levels(ap_sf$Species)))
+
+# source("R/3 dist_hist.R")
+# bins = 40
+plot_hist(ap_sf, sp, by_season = F, n_bins = bins) + ggtitle(label = "All KW sightings") #+  scale_x_continuous(limits = c(NA,1.26))
+
+
+```

@@ -1,0 +1,21 @@
+analysis notes
+
+Nov 28, 2022
+
+segments 5 km corresponding to finest resolution of covariate data (as in Becker et al 2010 & PRISMM)
+
+"Count model" only lets us use segment-level covariates
+- response is counts per segment
+- adjusting for effort
+- area = Aj * pj (area of each segment is area multiplied by detection probability given the conditions)
+
+"Estimated abundance" lets us use either seg-level or observation-level
+- horvitz thompson estimator is response  
+- effort is area of each segment
+
+When to use each approach?
+Generally "nicer" to adjust effort
+Keep response (counts) close to what was observed
+Unless you want observation-level covariates
+
+Therefore, check relevant covariates for each species. 

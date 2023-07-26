@@ -1,0 +1,2114 @@
+---
+title: "CeMoRe Harbour Porpoise Detection Function Exploration"
+author: "Elise Keppel"
+date: "`r Sys.Date()`"
+output: pdf_document
+fig_caption: true
+filename: "hp_df_reticle_stgs_only.pdf"
+---
+  
+```{r setup, include=FALSE, message = FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = F)
+source("../R/0 Setup.R")
+```
+
+<!-- # ```{r load_spatial} -->
+  <!-- # if(!exists("coast")){ -->
+  <!-- # coast <- sf::st_read(dsn = "shapefiles", layer = "BC_coast_UTM9", quiet = T) -->
+  <!-- # } -->
+  <!-- # coord <- ggplot2::coord_sf(xlim = c(-125.5, -123), ylim = c(48.1, 49.5), crs = sf::st_crs(4326))  -->
+  <!-- # ``` -->
+  
+```{r load_data}
+rerun <- T
+# survey_title2 <- "Feb 2022"
+dir <- "C:/users/keppele/documents/cemore/analysis/cemore_analysis/reporting/data/"
+# Load previously saved data
+
+iterations <- surveys %>% 
+  mutate(year=as.numeric(year)) %>% 
+  dplyr::select(c(SurveyID,iteration)) %>% 
+  filter(!iteration %in% c(16,99)) 
+
+# Load previously saved data
+all_effort_lines <- readRDS(paste0("../output/all_lines/all_effort_lines_to_", year,"_",month, ".rds")) %>% 
+  # mutate(Glare = ifelse(Glare == "Severe", "y","n"))
+  left_join(iterations)
+all_ap_sf <- readRDS(paste0("../output/all_sgt/all_effort_sgt_to_", year, "_",month, ".rds")) %>% left_join(iterations)
+
+all_ap_sf <- all_ap_sf %>% 
+  rename(GroupSize=Group_Size,Glare90=glare) %>%
+  mutate(Beaufort = as.numeric(as.character(Beaufort)),
+         Clumped_Beaufort = case_when(
+           Beaufort <2 ~ "0-1",
+           Beaufort == 2 ~ "2",
+           Beaufort > 2 ~ "3+"),
+         Clumped_Group_Size = factor(
+           dplyr::case_when(
+             GroupSize==1 ~ "1",
+             GroupSize==2 ~ "2",
+             GroupSize==3 ~ "3",
+             GroupSize>3 ~ "4+"
+           ), levels=  c("1","2","3","4+")),
+         swell=factor(case_when(
+           swell == "Big >2" ~ "Mod-Big",
+           swell == "Moderate 1-2 m" ~ "Mod-Big",
+           swell == "Low <1 m" ~ "Low",
+           swell == "No swell" ~ "None"),
+           levels= c("None", "Low", "Mod-Big")),
+         Clumped_Vis = case_when(
+           Visibility == "G&E"~ "G/E",
+           !Visibility == "G&E"~ "M/P"),
+         l_glare = ifelse(Glare90 == "None", NA, l_glare) %>% as.numeric(),
+         r_glare = ifelse(Glare90 == "None", NA, r_glare) %>% as.numeric(),
+         Glare90y = ifelse(Glare90=="None","n","y"),
+         Glare45 = ifelse(l_glare %in% -45:45 | r_glare %in% -45:45, Glare90, "None"),
+         Glare45y = ifelse(Glare45=="None","n","y")
+  ) 
+l <- sum(st_length(all_effort_lines))
+w = 1 # km
+a <- l * w * 2
+```
+
+```{r set-sp}
+sp <-  "harbour porpoise"
+sf <- all_ap_sf %>% filter(Species %like% sp)
+# sf <- sf %>% filter(!is.na(Reticle))
+df <- sf %>% data.frame()
+# see how many  lines affected by Glare
+# all_effort_lines %>% as.data.frame() %>% group_by(Glare) %>% dplyr::summarise(n())
+# see how many sightings affected by Glare
+# df %>% group_by(Glare) %>% dplyr::summarise(n())
+n <-  nrow(sf)
+```
+
+# `r sp` sightings to `r year` `r month_abb`
+Examine sighting distribution histograms at different bin levels to 
+check for evasive behaviour or heaping (observer measurement rounding)
+
+non-reticle sightings removed there are plenty of reticle sightings
+
+
+N = `r n`
+
+```{r hist}
+par(mfrow=c(1,2))
+hist(sf$distance, xlab="Distance (km)", breaks=seq(0,max(sf$distance),len=30),
+          main=paste0(sp," to ", survey_title))
+hist(sf$distance, xlab="Distance (km)", breaks=seq(0,max(sf$distance),len=60),
+          main=paste0(sp, " to ", survey_title, " - 60 bins"))
+
+# hist(sf$distance, xlab="Distance (km)", breaks=seq(0,max(sf$distance),len=30),
+#      main=paste0(sp, " to ", survey_title, "-30bins")) + xlim(0,1)
+# hist(sf$distance, xlab="Distance (km)",breaks=seq(0,max(sf$distance),len=60),
+#      main=paste0(sp, " to ", survey_title, "-60bins")) + xlim(0,1)
+```
+
+No apparent evasive behaviour (fewer detections around 0 distance), there may be some heaping suggesting observers are finding more animals at bearing 0 (close to the line). This is something the observers are aware of in distance sampling and will continue to try to avoid this.
+
+Try removing non-reticle sighitngs (eye-balled distances) to see if it improves fit:
+  
+```{r hist-ret-only, fig.cap = "Reticle sightings only (no distances estimated by eye). Eyeballed distance estimates close to the survey vessel removed and no apparent observer biases observed."}
+
+sf_ret <- sf %>% filter(!is.na(Reticle))
+n_ret <- nrow(sf_ret)
+
+cat(paste0("N = ",n_ret))
+
+par(mfrow=c(1,2))
+hist(sf_ret$distance, xlab="Distance (km)",breaks=seq(0,max(sf$distance),len=30),
+     main=paste0("To ", survey_title, " - ret only"))
+hist(sf_ret$distance, xlab="Distance (km)", breaks=seq(0,max(sf$distance),len=40),
+     main=paste0("To ", survey_title, " - ", "bins - ret only"))
+
+# hist(sf$distance, xlab="Distance (km)",breaks=seq(0,max(sf$distance),len=30),
+#      main=paste0("To ", survey_title, " - 30bins - ret only"))
+# hist(sf$distance, xlab="Distance (km)",breaks=seq(0,max(sf$distance),len=60),
+#      main=paste0("To ", survey_title, " - 60bins - ret only"))
+```
+
+N = `r n` reticle sightings, `r n-n_ret` eye-balled distance sightings discarded
+
+This looks a little better, so we'll move forward with reticle sightings only.
+
+<!-- Compare dist hist plots from MB and RB -->
+
+<!-- Number of `r sp` sightings from MB =  $`r nrow(subset(sf, Vessel=="MB"))`$ -->
+<!-- Number of `r sp` sightings from RB =  $`r nrow(subset(sf, Vessel=="RB"))`$ -->
+
+<!-- ```{r hist-Vessel, fig.cap="Distance frequency from MV MB (left) and MV RB (right)", fig.width=10} -->
+<!-- par(mfrow=c(1,2)) -->
+<!-- # sf <- all_ap_sf %>% filter(Species == "Humpback") -->
+
+<!-- hist(subset(sf, Vessel=="MB")$distance, -->
+<!--      main=paste("MB: ", sp, " to ", survey_title, " -30 bins"), breaks=seq(0,max(sf$distance),len=30), -->
+<!--      xlab="Distance (km)") -->
+
+<!-- hist(subset(sf, Vessel=="RB")$distance, -->
+<!--      main=paste("RB: ", sp, " to ", survey_title, " -30 bins"), breaks=seq(0,max(sf$distance),len=30), -->
+<!--      xlab="Distance (km)", ylim = c(0,5)) -->
+
+<!-- sf <- sf %>% filter(Vessel == "MB") -->
+<!-- # unique(as.data.frame(all_ap_sf)[c("Vessel", "Species")]) -->
+<!-- # all_ap_sf %>% filter(Vessel == "RB", Species == "Humpback") -->
+<!-- # all_ap_sf %>% filter(Vessel == "MB", Species == "Humpback") %>% nrow() -->
+
+<!-- ``` -->
+
+<!-- Very few RB sightings. We will move forward with MB sightings only. -->
+
+# Detection Functions
+Models with truncation at 1, 0.8, 0.7 and 0.65 km were examined. 
+
+## Half normal model
+
+```{r hn, results = "as.is", fig.cap = "Half-normal models, with 1, 0.8, 0.7 and 0.65 km truncation."}
+file <- paste0(dir,"hp_hn",survey_title)
+if(!rerun & file.exists(file)){
+  load(file)
+}else{
+
+# hn.3 <-ds(df, key = "hn", truncation = 3)
+# hn.2.5 <-ds(df, key = "hn", truncation = 2.5)
+# hn.2 <-ds(df, key = "hn", truncation = 2)
+# hn.1.5 <-ds(df, key = "hn", truncation = 1.5)
+# hn.1.25 <-ds(df, key = "hn", truncation = 1.25)
+hn.1    <-ds(df, key = "hn", truncation = 1)
+hn.0.8  <-ds(df, key = "hn", truncation = 0.8)
+hn.0.7 <-ds(df, key = "hn", truncation = 0.7)
+hn.0.65  <-ds(df, key = "hn", truncation = 0.65)
+# hn.0.75 <-ds(df, key = "hn", truncation = 0.75)
+
+save(hn.1,   
+     hn.0.8, 
+     hn.0.7, 
+     hn.0.65,
+     file=file)
+}
+
+# hn.1 <-ds(df, key = "hn", truncation = 1, adjustment = "cos")
+# hn.1 <-ds(df, key = "hn", truncation = 1, adjustment = "herm")
+# hn.1 <-ds(df, key = "hn", truncation = 1, adjustment = "poly")
+
+# par(mfrow=c(1,2))
+# plot_df(sp, hn.3)
+# plot_df(sp, hn.2.5)
+
+par(mfrow=c(1,2))
+# plot_df(sp, hn.2) # TO DO try adding showpoints=FALSE into plot() in plot_df(), particularly for models wo covariates
+# plot_df(sp, hn.1.5)
+# par(mfrow=c(1,2))
+# plot_df(sp, hn.1.25)
+plot_df(sp, hn.1)
+plot_df(sp, hn.0.8 )
+plot_df(sp, hn.0.7)
+plot_df(sp, hn.0.65 )
+# plot_df(sp, hn.0.75)
+# plot_df(sp, hn.0.5)
+
+# par(mfrow=c(1,2))
+# gof_ds(hn.3, main="hn.3") 
+# gof_ds(hn.2.5, main="hn.2.5") 
+par(mfrow=c(1,2))
+# gof_ds(hn.2, main="hn.2") 
+# gof_ds(hn.1.5, main="hn.1.5")
+# gof_ds(hn.1.25, main="hn.1.25")
+gof_ds(hn.1, main="hn.1")
+gof_ds(hn.0.8 , main="hn.0.8 ")
+gof_ds(hn.0.7, main="hn.0.7")
+gof_ds(hn.0.65 , main="hn.0.65 ")
+# gof_ds(hn.0.75, main="hn.0.75")
+# gof_ds(hn.0.5, main="hn.0.5")
+
+
+```
+
+\newpage
+## Hazard rate
+
+```{r hr, results = "as.is", fig.cap = "Hazard rate models with 1, 0.8, 0.7 and 0.65 km truncation."}
+file <- paste0(dir,"hp_hr",survey_title)
+if(!rerun & file.exists(file)){
+  load(file)
+}else{
+
+# hr.3 <-ds(df, key = "hr", truncation = 3)
+# hr.2.5 <-ds(df, key = "hr", truncation = 2.5)
+# hr.2 <-ds(df, key = "hr", truncation = 2)
+# hr.1.5 <-ds(df, key = "hr", truncation = 1.5)
+# hr.1.25 <-ds(df, key = "hr", truncation = 1.25)
+hr.1    <-ds(df, key = "hr", truncation = 1)
+hr.0.8  <-ds(df, key = "hr", truncation = 0.8 )# hr.0.75 <-ds(df, key = "hr", truncation = 0.75)
+hr.0.7 <-ds(df, key = "hr", truncation = 0.7)
+hr.0.65  <-ds(df, key = "hr", truncation = 0.65 )
+# hr.0.5 <-ds(df, key = "hr", truncation = 0.5)
+save(hr.1,   
+     hr.0.8, 
+     hr.0.7, 
+     hr.0.65,
+     file=file)
+}
+# hn.1 <-ds(df, key = "hn", truncation = 1, adjustment = "cos")
+# hn.1 <-ds(df, key = "hn", truncation = 1, adjustment = "herm")
+# hn.1 <-ds(df, key = "hn", truncation = 1, adjustment = "poly")
+
+par(mfrow=c(1,2))
+# plot_df(sp, hr.2) # TO DO try adding showpoints=FALSE into plot() in plot_df(), particularly for models wo covariates
+# plot_df(sp, hr.1.5)
+# par(mfrow=c(1,2))
+# plot_df(sp, hr.1.25)
+plot_df(sp, hr.1)
+plot_df(sp, hr.0.8)
+plot_df(sp, hr.0.7)
+plot_df(sp, hr.0.65)
+# par(mfrow=c(1,2))
+# plot_df(sp, hr.0.75)
+# plot_df(sp, hr.0.5)
+
+# par(mfrow=c(1,2))
+# gof_ds(hr.3, main="hr.3") 
+# gof_ds(hr.2.5, main="hr.2.5") 
+par(mfrow=c(1,2))
+# gof_ds(hr.2, main="hr.2") 
+# gof_ds(hr.1.5, main="hr.1.5")
+# par(mfrow=c(1,2))
+# gof_ds(hr.1.25, main="hr.1.25")
+gof_ds(hr.1, main="hn.1")
+gof_ds(hr.0.8 , main="hn.0.8 ")
+gof_ds(hr.0.7, main="hn.0.7")
+gof_ds(hr.0.65 , main="hn.0.65 ")
+# par(mfrow=c(1,2))
+# gof_ds(hr.0.75, main="hr.0.75")
+# gof_ds(hr.0.5, main="hr.0.5")
+```
+
+
+## Uniform
+
+```{r un, results = "as.is", fig.cap = "Uniform models with truncation at 1, 0.8, 0.7 and 0.65 km (right)."}
+file <- paste0(dir,"hp_un",survey_title)
+if(!rerun & file.exists(file)){
+  load(file)
+}else{
+
+un.1   <-ds(df, key = "unif", truncation = 1)
+un.0.8 <-ds(df, key = "unif", truncation = 0.8)
+un.0.7 <-ds(df, key = "unif", truncation = 0.7)
+un.0.65 <-ds(df, key = "unif", truncation = 0.65)
+
+save(un.1,   
+     un.0.8, 
+     un.0.7, 
+     un.0.65,
+     file=file)
+}
+
+par(mfrow=c(1,2))
+plot_df(sp, un.1  )
+plot_df(sp, un.0.8)
+plot_df(sp, un.0.7  )
+plot_df(sp, un.0.65)
+par(mfrow=c(1,2))
+gof_ds(un.1  , main="un.1")   
+gof_ds(un.0.8, main="un.0.8")
+gof_ds(un.1  , main="un.0.7")   
+gof_ds(un.0.8, main="un.0.65")
+```
+
+<!-- And still not amazing... may need to add in some covariates -->
+```{r hr_hn}
+model.table.1km <- summarize_ds_models(hn.1, 
+                                   hr.1,
+                                   un.1,
+                                   output="plain") 
+kableExtra::kable(model.table.1km, digits=3, row.names = FALSE, escape=FALSE,
+      caption = paste(sp, " - Comparison of half normal, hazard rate, uniform models. Truncation = 1 km.")) %>%
+  kableExtra::landscape()
+#------------------------------------
+model.table.0.8km <- summarize_ds_models(hn.0.8, 
+                                   hr.0.8, 
+                                   un.0.8,
+                                   output="plain") 
+
+kableExtra::kable(model.table.0.8km, digits=3, row.names = FALSE, escape=FALSE,
+      caption = paste(sp, " - Comparison of half normal and hazard rate, uniform models. Truncation = 0.8 km.")) %>%
+  kableExtra::landscape()
+#------------------------------------
+model.table.0.7km <- summarize_ds_models(hn.0.7, 
+                                   hr.0.7, 
+                                   un.0.7,
+                                   output="plain") 
+
+kableExtra::kable(model.table.0.7km, digits=3, row.names = FALSE, escape=FALSE,
+      caption = paste(sp, " - Comparison of half normal and hazard rate, uniform models. Truncation = 0.7 km.")) %>%
+  kableExtra::landscape()
+#------------------------------------
+model.table.0.65km <- summarize_ds_models(hn.0.65, 
+                                   hr.0.65, 
+                                   un.0.65,
+                                   output="plain") 
+
+kableExtra::kable(model.table.0.65km, digits=3, row.names = FALSE, escape=FALSE,
+      caption = paste(sp, " - Comparison of half normal and hazard rate, uniform models. Truncation = 0.65 km.")) %>%
+  kableExtra::landscape()
+```
+
+\newpage
+# Covariates
+## Beaufort
+Try including covariates in the detection functions. 
+Note that there's a broad range of probabilities of detection estimated for some models that get averaged out in the summary.
+Can be examined using p_dist_table().
+Also, run `gof_ds()` on each of our models and look at the corresponding plots.
+
+Truncating tabled beaufort data to 0.8 km.
+```{r beau}
+df1 <- df %>% filter(distance <= 0.8)
+table(df1$Beaufort)
+
+all_effort_lines_sum <- all_effort_lines %>% mutate(length_km = as.numeric(st_length(geometry))/1000) %>% 
+  as.data.frame() %>% mutate(Beaufort = factor(Beaufort, levels = seq(0,max(Beaufort))))
+
+df_sum <- df %>%
+  dplyr::group_by(Beaufort) %>% dplyr::summarise(Observations = sum(GroupSize)) %>% 
+  as.data.frame() 
+
+par(mfrow=c(1,2))
+# hist(df$Beaufort, #breaks=seq(0, 5, by=1),
+#      main="Obs per Beaufort level",
+#      xlab="Beaufort") # except this assumes one Beaufort value per segment (which makes sense for count models (segment level covariates), but not 
+# estimated abundance models (observation-level covariates)
+
+ggplot(all_effort_lines_sum, aes(x=Beaufort, y=length_km)) + 
+  geom_bar(stat = "identity")
+ggplot(df_sum, aes(x=Beaufort, y=Observations)) + 
+  geom_bar(stat = "identity")
+```
+
+
+
+```{r beau-hn-hr}
+file <- paste0(dir,"hp_hn_hr_bf",survey_title)
+if(!rerun & file.exists(file)){
+  load(file)
+}else{
+
+hn.bf1 <- ds(data=df, truncation=1, key="hn", formula=~Beaufort)
+hn.bf0.8 <- ds(data=df, truncation=0.8, key="hn", formula=~Beaufort)
+hn.bf0.7 <- ds(data=df, truncation=0.7, key="hn", formula=~Beaufort)
+hn.bf0.65 <- ds(data=df, truncation=0.65, key="hn", formula=~Beaufort)
+# p_dist_table(hn.bf2) %>% kableExt0.65a::kable()
+# p_dist_table(hr.bf2)%>% kableExtra::kable()
+hr.bf1 <- ds(data=df, truncation=1, key="hr", formula=~Beaufort)
+hr.bf0.8 <- ds(data=df, truncation=0.8, key="hr", formula=~Beaufort)
+hr.bf0.7 <- ds(data=df, truncation=0.7, key="hr", formula=~Beaufort)
+hr.bf0.65 <- ds(data=df, truncation=0.65, key="hr", formula=~Beaufort)# par(mfrow=c(1,2))
+
+save(hn.bf1 ,
+     hn.bf0.8 ,
+     hn.bf0.7 ,
+     hn.bf0.65,
+     hr.bf1 ,
+hr.bf0.8 ,
+hr.bf0.7 ,
+hr.bf0.65,
+     file=file)
+}
+par(mfrow=c(1,2))
+plot_df(sp, hn.bf1)
+plot_df(sp, hn.bf0.8)
+plot_df(sp, hn.bf0.7)
+plot_df(sp, hn.bf0.65)
+
+par(mfrow=c(1,2))
+gof_ds(hn.bf1, main="hn.bf1")
+gof_ds(hn.bf0.8, main="hn.bf0.8")
+gof_ds(hn.bf0.7, main="hn.bf0.7")
+gof_ds(hn.bf0.65, main="hn.bf0.65")
+#-----------------------------------------
+
+par(mfrow=c(1,2))
+plot_df(sp, hr.bf1)
+plot_df(sp, hr.bf0.8)
+plot_df(sp, hr.bf0.7)
+plot_df(sp, hr.bf0.65)
+
+par(mfrow=c(1,2))
+gof_ds(hr.bf1, main="hr.bf1")
+gof_ds(hr.bf0.8, main="hr.bf0.8")
+gof_ds(hr.bf0.7, main="hr.bf0.7")
+gof_ds(hr.bf0.65, main="hr.bf0.65")
+
+```
+
+<!-- hr.bf1 and hr.bf0.65 appear to be a better fit... but none are amazing. -->
+
+### Clumping Beaufort
+Let's try clumping beaufort into groups: 0-1, 2, 3+
+
+These groups were chosen partially to make the groups somewhat even in terms of number of observations per category, but were also chosen based on our ideas about how detectability of the species of interest might be impacted by increasing Beaufort level. For instance, beaufort may impact sightability of porpoises more than humpbacks, so the grouping may be shifted to the left to account for more sightings at the lower end of the beaufort scale.
+
+```{r clump-beau}
+
+df <- df %>% dplyr::mutate(bfc = case_when(
+  Beaufort == 0 ~ "0",
+  Beaufort == 1 ~ "1",
+  Beaufort == 2 ~ "2",
+  Beaufort > 2 ~ "3+"
+),bfcb = case_when(
+  Beaufort == 0 ~ "0",
+  Beaufort == 1 ~ "1",
+  Beaufort > 1 ~ "2+"
+))
+
+df1 <- df %>% filter(distance <= 0.8)
+table(df1$bfc)
+table(df1$bfcb)
+
+file <- paste0(dir,"hp_hn_hr_bfc_bfcb",survey_title)
+if(!rerun & file.exists(file)){
+  load(file)
+}else{
+
+hn.bf1c <- ds(data=df, truncation=1, key="hn", formula=~bfc)
+hn.bf0.8c <- ds(data=df, truncation=0.8, key="hn", formula=~bfc)
+hn.bf0.7c <- ds(data=df, truncation=0.7, key="hn", formula=~bfc)
+hn.bf0.65c <- ds(data=df, truncation=0.65, key="hn", formula=~bfc)
+
+hn.bf1cb <- ds(data=df, truncation=1, key="hn", formula=~bfcb)
+hn.bf0.8cb <- ds(data=df, truncation=0.8, key="hn", formula=~bfcb)
+hn.bf0.7cb <- ds(data=df, truncation=0.7, key="hn", formula=~bfcb)
+hn.bf0.65cb <- ds(data=df, truncation=0.65, key="hn", formula=~bfcb)
+# p_dist_table(hn.bf2) %>% kableExt0.65a::kable()
+# p_dist_table(hr.bf2)%>% kableExtra::kable()
+hr.bf1c <- ds(data=df, truncation=1, key="hr", formula=~bfc)
+hr.bf0.8c <- ds(data=df, truncation=0.8, key="hr", formula=~bfc)
+hr.bf0.7c <- ds(data=df, truncation=0.7, key="hr", formula=~bfc)
+hr.bf0.65c <- ds(data=df, truncation=0.65, key="hr", formula=~bfc)# par(mfrow=c(1,2))
+
+hr.bf1cb <- ds(data=df, truncation=1, key="hr", formula=~bfcb)
+hr.bf0.8cb <- ds(data=df, truncation=0.8, key="hr", formula=~bfcb)
+hr.bf0.7cb <- ds(data=df, truncation=0.7, key="hr", formula=~bfcb)
+hr.bf0.65cb <- ds(data=df, truncation=0.65, key="hr", formula=~bfcb)# par(mfrow=c(1,2))
+
+save(hn.bf1c ,
+     hn.bf0.8c ,
+     hn.bf0.7c ,
+     hn.bf0.65c,
+     hn.bf1cb ,
+hn.bf0.8cb ,
+hn.bf0.7cb ,
+hn.bf0.65cb,
+hr.bf1c ,
+hr.bf0.8c ,
+hr.bf0.7c ,
+hr.bf0.65c,
+hr.bf1cb ,
+hr.bf0.8cb ,
+hr.bf0.7cb ,
+hr.bf0.65cb,
+     file=file)
+}
+
+# par(mfrow=c(1,2))
+# p_dist_table(hn.bf1.5) %>% kableExtra::kable()
+# p_dist_table(hr.bf1.5)%>% kableExtra::kable()
+par(mfrow=c(1,2))
+# plot_df(sp, hn.bf1c)
+plot_df(sp, hn.bf0.8c)
+plot_df(sp, hn.bf0.7c)
+# plot_df(sp, hn.bf0.65c)
+
+par(mfrow=c(1,2))
+gof_ds(hn.bf1c, main="hn.bf1c")
+gof_ds(hn.bf0.8c, main="hn.bf0.8c")
+gof_ds(hn.bf0.7c, main="hn.bf0.7c")
+gof_ds(hn.bf0.65c, main="hn.bf0.65c")
+#---------------------------------------------------
+
+
+par(mfrow=c(1,2))
+plot_df(sp, hr.bf1c)
+plot_df(sp, hr.bf0.8c)
+plot_df(sp, hr.bf0.7c)
+plot_df(sp, hr.bf0.65c)
+
+par(mfrow=c(1,2))
+gof_ds(hr.bf1c, main="hr.bf1c")
+gof_ds(hr.bf0.8c, main="hr.bf0.8c")
+gof_ds(hr.bf0.7c, main="hr.bf0.7c")
+gof_ds(hr.bf0.65c, main="hr.bf0.65c")
+```
+<!-- Let's try clumping beaufort into alternate groups: 0-1, 2+ -->
+  
+  <!-- ```{r beau-clumpb} -->
+  <!-- df <- df %>% dplyr::mutate(bfcb = case_when( -->
+                                                      <!--   Beaufort <2 ~ "0-1", -->
+                                                      <!--   Beaufort > 1 ~ "2+" -->
+                                                      <!-- )) -->
+  
+  <!-- table(df$Beaufort) -->
+  
+  <!-- # hn.bf1cb <- ds(data=df, truncation=1, key="hn", formula=~bfcb) -->
+  <!-- hn.bf0.8cb <- ds(data=df, truncation=0.8, key="hn", formula=~bfcb) -->
+  <!-- hn.bf0.7cb <- ds(data=df, truncation=0.7, key="hn", formula=~bfcb) -->
+  <!-- # hn.bf0.65cb <- ds(data=df, truncation=0.65, key="hn", formula=~bfcb) -->
+  
+  <!-- par(mfrow=c(1,2)) -->
+  <!-- # plot_df(sp, hn.bf1cb) -->
+  <!-- plot_df(sp, hn.bf0.8cb) -->
+  <!-- plot_df(sp, hn.bf0.7cb) -->
+  <!-- # plot_df(sp, hn.bf0.65cb) -->
+  
+  <!-- par(mfrow=c(1,2)) -->
+  <!-- # gof_ds(hn.bf1cb, main="hn.bf1cb") -->
+  <!-- gof_ds(hn.bf0.8cb, main="hn.bf0.8cb") -->
+  <!-- gof_ds(hn.bf0.7cb, main="hn.bf0.7cb") -->
+  <!-- # gof_ds(hn.bf0.65cb, main="hn.bf0.65cb") -->
+  <!-- #--------------------------------------------------- -->
+  <!-- # hr.bf1cb <- ds(data=df, truncation=1, key="hr", formula=~bfcb) -->
+  <!-- hr.bf0.8cb <- ds(data=df, truncation=0.8, key="hr", formula=~bfcb) -->
+  <!-- hr.bf0.7cb <- ds(data=df, truncation=0.7, key="hr", formula=~bfcb) -->
+  <!-- # hr.bf0.65cb <- ds(data=df, truncation=0.65, key="hr", formula=~bfcb)# par(mfrow=c(1,2)) -->
+  <!-- # par(mfrow=c(1,2)) -->
+  <!-- # p_dist_table(hn.bf1.5) %>% kableExtra::kable() -->
+  <!-- # p_dist_table(hr.bf1.5)%>% kableExtra::kable() -->
+  
+  <!-- par(mfrow=c(1,2)) -->
+  <!-- # plot_df(sp, hr.bf1cb) -->
+  <!-- plot_df(sp, hr.bf0.8cb) -->
+  <!-- plot_df(sp, hr.bf0.7cb) -->
+  <!-- # plot_df(sp, hr.bf0.65cb) -->
+  
+  <!-- par(mfrow=c(1,2)) -->
+  <!-- # gof_ds(hr.bf1cb, main="hr.bf1cb") -->
+  <!-- gof_ds(hr.bf0.8cb, main="hr.bf0.8cb") -->
+  <!-- gof_ds(hr.bf0.7cb, main="hr.bf0.7cb") -->
+  <!-- # gof_ds(hr.bf0.65cb, main="hr.bf0.65cb") -->
+  <!-- ``` -->
+  
+  <!-- That looks better! Compare: -->
+  <!-- Beaufort clumped into groups: bfc groups = 0-1, 2, 3+, bfcb groups = 0-1, 2+ -->
+  
+```{r beau-table}
+# model_table_1km_no_cov <- summarize_ds_models(hn_2)
+
+model.table.1km <- summarize_ds_models(
+  hn.1,
+  hr.1,
+  un.1,
+  hn.bf1,
+  hr.bf1,
+  hn.bf1c,
+  hr.bf1c,
+  hn.bf1cb,
+  hr.bf1cb,output="plain")
+kableExtra::kable(model.table.1km, digits=3, row.names = FALSE, escape=FALSE,
+      caption = paste(sp, " - Comparison of half normal and hazard rate with beaufort. Truncation = 1 km.")) %>%
+  kableExtra::landscape()
+#--------------------------------------------------------------------------------
+model.table.0.8km <- summarize_ds_models(hn.0.8, 
+                                         hr.0.8, 
+                                         un.0.8,
+                                         hn.bf0.8,
+                                         hr.bf0.8,
+                                         hn.bf0.8c,
+                                         hr.bf0.8c,
+                                         hn.bf0.8cb,
+                                         hr.bf0.8cb,
+                                         output="plain") 
+
+kableExtra::kable(model.table.0.8km, digits=3, row.names = FALSE, escape=FALSE,
+                  caption = paste(sp, " - Comparison of half normal and hazard rate with beaufort. Truncation = 0.8 km.")) %>%
+  kableExtra::landscape()
+#--------------------------------------------------------------------------------
+
+model.table.0.7km <- summarize_ds_models(
+  hn.0.7,
+  hr.0.7,
+  # un.0.7,
+  hn.bf0.7,
+  hr.bf0.7,
+  hn.bf0.7c,
+  hr.bf0.7c,
+  hn.bf0.7cb,
+  hr.bf0.7cb,
+  output="plain") 
+
+kableExtra::kable(model.table.0.7km, digits=3, row.names = FALSE, escape=FALSE,
+                  caption = paste(sp, " - Comparison of half normal and hazard rate with beaufort. Truncation = 0.7 km.")) %>%
+  kableExtra::landscape()
+#--------------------------------------------------------------------------------
+model.table.0.65km <- summarize_ds_models(hn.0.65,
+                                   hr.0.65,
+                                   # un.0.65,
+                                   hn.bf0.65,
+                                   hr.bf0.65,
+                                   hn.bf0.65c,
+                                   hr.bf0.65c,
+                                   hn.bf0.65cb,
+                                   hr.bf0.65cb,output="plain")
+
+kableExtra::kable(model.table.0.65km, digits=3, row.names = FALSE, escape=FALSE,
+      caption = paste(sp, " - Comparison of half normal and hazard rate with beaufort. Truncation = 0.65 km.")) %>%
+  kableExtra::landscape()
+
+
+```
+
+It seems that half-normal functions with beaufort either ungrouped, or grouped by 0-1, 2, 3+ have the lowest AIC, and truncation of 0.7 and 0.8 km have a better gof. We'll continue looking at models with each of these truncation distances and compare outputs (AIC and gof).
+
+## Group size
+Or observed group size:
+
+```{r size}
+table(df1$GroupSize)
+
+file <- paste0(dir,"hp_hn_hr_sz",survey_title)
+if(!rerun & file.exists(file)){
+  load(file)
+}else{
+
+hn.sz1     <- ds(data=df, truncation=1,  key="hn", formula=~GroupSize)
+hn.sz0.8  <- ds(data=df, truncation=0.8,  key="hn", formula=~GroupSize)
+hn.sz0.7    <- ds(data=df, truncation=0.7,    key="hn", formula=~GroupSize)
+hn.sz0.65 <- ds(data=df, truncation=0.65, key="hn", formula=~GroupSize)
+# par(mfrow=c(1,2))
+# p_dist_table(hn.sz2) %>% kableExtra::kable()
+# p_dist_table(hr.sz2)%>% kableExtra::kable()
+hr.sz1    <- ds(data=df, truncation=1, key="hr", formula=~GroupSize)
+hr.sz0.8  <- ds(data=df, truncation=0.8, key="hr", formula=~GroupSize)
+hr.sz0.7  <- ds(data=df, truncation=0.7, key="hr", formula=~GroupSize)
+hr.sz0.65 <- ds(data=df, truncation=0.65, key="hr", formula=~GroupSize)
+# par(mfrow=c(1,2))
+# p_dist_table(hn.sz0.8) %>% kableExtra::kable()
+# p_dist_table(hr.sz0.8)%>% kableExtra::kable()
+
+save(hn.sz1   ,
+     hn.sz0.8 ,
+     hn.sz0.7 ,
+     hn.sz0.65,
+hr.sz1   ,
+hr.sz0.8 ,
+hr.sz0.7 ,
+hr.sz0.65,
+     file=file)
+}
+
+par(mfrow=c(1,2))
+plot_df(sp, hn.sz1)
+plot_df(sp, hn.sz0.8)
+plot_df(sp, hn.sz0.7)
+plot_df(sp, hn.sz0.65)
+
+
+par(mfrow=c(1,2))
+gof_ds(hn.sz1,    main="hn.sz1")
+gof_ds(hn.sz0.8,  main="hn.sz0.8")
+gof_ds(hn.sz0.7,  main="hn.sz0.7")
+gof_ds(hn.sz0.65, main="hn.sz0.65")
+
+#--------------------------------------------------------
+
+par(mfrow=c(1,2))
+plot_df(sp, hr.sz1)
+plot_df(sp, hr.sz0.8)
+plot_df(sp, hr.sz0.7)
+plot_df(sp, hr.sz0.65)
+
+par(mfrow=c(1,2))
+gof_ds(hr.sz1   , main="hr.sz1")
+gof_ds(hr.sz0.8 , main="hr.sz0.8")
+gof_ds(hr.sz0.7 , main="hr.sz0.7")
+gof_ds(hr.sz0.65, main="hr.sz0.65")
+
+```
+
+### Clumped group size - try checking table with truncated distance and 1 vs 2+
+
+```{r size_clumped}
+# to do: sample sizes by truncation distance and various variables
+# to do: summary table with sample size for each variable(bfc) at each truncation distance
+# to do: try as a categorical variable in future with more sightings, esp in the higher counts
+# to do: try visibility and observer as covariates
+df <- df %>% dplyr::mutate(szc = case_when(
+  GroupSize == 1 ~ "1",
+  GroupSize == 2 ~ "2",
+  GroupSize > 2 ~ "3+"), 
+  szcb = case_when(
+    GroupSize == 1 ~ "1",
+    GroupSize > 1 & GroupSize < 4 ~ "2-3",
+    GroupSize > 3 ~ "4+"
+  ))
+df1 <- df %>% filter(distance <0.8)
+
+table(df$szc)
+table(df$szcb)
+
+file <- paste0(dir,"hp_hn_hr_sz",survey_title)
+if(!rerun & file.exists(file)){
+  load(file)
+}else{
+
+hn.szc1     <- ds(data=df, truncation=1,  key="hn", formula=~szc)
+hn.szc0.8  <- ds(data=df, truncation=0.8,  key="hn", formula=~szc)
+hn.szc0.7    <- ds(data=df, truncation=0.7,    key="hn", formula=~szc)
+hn.szc0.65 <- ds(data=df, truncation=0.65, key="hn", formula=~szc)
+
+hn.szc1b     <- ds(data=df, truncation=1,  key="hn", formula=~szcb)
+hn.szc0.8b  <- ds(data=df, truncation=0.8,  key="hn", formula=~szcb)
+hn.szc0.7b  <- ds(data=df, truncation=0.7,    key="hn", formula=~szcb)
+hn.szc0.65b <- ds(data=df, truncation=0.65, key="hn", formula=~szcb)
+
+hr.szc1    <- ds(data=df, truncation=1, key="hr", formula=~szc)
+hr.szc0.8  <- ds(data=df, truncation=0.8, key="hr", formula=~szc)
+hr.szc0.7  <- ds(data=df, truncation=0.7, key="hr", formula=~szc)
+hr.szc0.65 <- ds(data=df, truncation=0.65, key="hr", formula=~szc)
+
+hr.szc1b    <- ds(data=df, truncation=1, key="hr", formula=~szcb)
+hr.szc0.8b  <- ds(data=df, truncation=0.8, key="hr", formula=~szcb)
+hr.szc0.7b  <- ds(data=df, truncation=0.7, key="hr", formula=~szcb)
+hr.szc0.65b <- ds(data=df, truncation=0.65, key="hr", formula=~szcb)
+
+save(hn.szc1   ,
+     hn.szc0.8 ,
+     hn.szc0.7 ,
+     hn.szc0.65,
+hn.szc1b   ,
+hn.szc0.8b ,
+hn.szc0.7b ,
+hn.szc0.65b,
+hr.szc1   ,
+hr.szc0.8 ,
+hr.szc0.7 ,
+hr.szc0.65,
+hr.szc1b   ,
+hr.szc0.8b ,
+hr.szc0.7b ,
+hr.szc0.65b,
+     file=file)
+}
+
+# par(mfrow=c(1,2))
+# p_dist_table(hn.sz0.8) %>% kableExtra::kable()
+# p_dist_table(hr.sz0.8)%>% kableExtra::kable()
+# par(mfrow=c(1,2))
+# p_dist_table(hn.sz2) %>% kableExtra::kable()
+# p_dist_table(hr.sz2)%>% kableExtra::kable()
+
+par(mfrow=c(1,2))
+plot_df(sp, hn.szc1)
+plot_df(sp, hn.szc0.8)
+plot_df(sp, hn.szc0.7)
+plot_df(sp, hn.szc0.65)
+
+
+par(mfrow=c(1,2))
+gof_ds(hn.szc1,    main="hn.szc1")
+gof_ds(hn.szc0.8,  main="hn.szc0.8")
+gof_ds(hn.szc0.7,  main="hn.szc0.7")
+gof_ds(hn.szc0.65, main="hn.szc0.65")
+
+#--------------------------------------------------------
+
+par(mfrow=c(1,2))
+plot_df(sp, hr.szc1)
+plot_df(sp, hr.szc0.8)
+plot_df(sp, hr.szc0.7)
+plot_df(sp, hr.szc0.65)
+
+par(mfrow=c(1,2))
+gof_ds(hr.szc1   , main="hr.szc1")
+gof_ds(hr.szc0.8 , main="hr.szc0.8")
+gof_ds(hr.szc0.7 , main="hr.szc0.7")
+gof_ds(hr.szc0.65, main="hr.szc0.65")
+```
+
+Compare: bf = beaufort unclumped, bfc groups = 0-1, 2, 3+, bfcb groups = 0-2, 3, 4+,
+ sz = group size unclumpted, szc = group sizes 1, 2, 3+, szcb = group sizes 1, 2-3, 4+
+
+```{r size-table}
+model.table.1km <- summarize_ds_models(
+  hn.1,
+  hr.1,
+  un.1,
+  hn.bf1,
+  hr.bf1,
+  hn.bf1c,
+  hr.bf1c,
+  hn.bf1cb,
+  hr.bf1cb,
+  # hn.sz1,
+  hr.sz1,
+  hn.szc1,
+  hr.szc1,
+  hn.szc1b,
+  hr.szc1b,
+  output="plain")
+tab.ft1 <-  model.table.1km$`Key function`[which(nchar(model.table.1km$`Key function`) >11)]
+
+model.table.1km %<>% mutate(`Key function` = case_when(
+    nchar(`Key function`)>12 ~ paste0(substring(`Key function`, 1,11),"*"),
+    nchar(`Key function`) <=12 ~ `Key function`))
+# saveRDS(model_table_2km, "model_table_2km.rds")
+
+kableExtra::kable(model.table.1km, digits=3, row.names = FALSE, escape=FALSE,
+      caption = paste(sp, " - Comparison of half normal and hazard rate with sea state and group size. Truncation = 1 km.")) %>%
+  kableExtra::footnote(paste0("* ", tab.ft1)) %>%
+  kableExtra::landscape()
+#--------------------------------------------------
+model.table.0.8km <- summarize_ds_models(
+  hn.0.8, 
+  hr.0.8, 
+  un.0.8,
+      hn.bf0.8,
+      hr.bf0.8,
+  # hn.bf0.8c,
+  # hr.bf0.8c,
+  # hn.bf0.8cb,
+  # hr.bf0.8cb,
+  # hn.sz0.8,
+  hr.sz0.8,
+  
+  hn.szc0.8,
+  hr.szc0.8,
+     hn.szc0.8b,
+     # hr.szc0.8b,
+  output="plain") 
+tab.ft0.8 <-  model.table.0.8km$`Key function`[which(nchar(model.table.0.8km$`Key function`) >11)]
+
+model.table.0.8km %<>% mutate(`Key function` = case_when(
+    nchar(`Key function`)>12 ~ paste0(substring(`Key function`, 1,11),"*"),
+    nchar(`Key function`) <=12 ~ `Key function`))
+# saveRDS(model_table_2km, "model_table_2km.rds")
+
+kableExtra::kable(model.table.0.8km, digits=3, row.names = FALSE, escape=FALSE,
+      caption = paste(sp, " - Comparison of half normal and hazard rate with sea state and group size. Truncation = 0.8 km.")) %>%
+  kableExtra::footnote(paste0("* ", tab.ft0.8)) %>% 
+  kableExtra::landscape()
+#--------------------------------------------------
+model.table.0.7km <- summarize_ds_models(
+  hn.0.7, 
+  hr.0.7, 
+  un.0.7,
+  hn.bf0.7,
+  hr.bf0.7,
+  # hn.bf0.7c,
+  # hr.bf0.7c,
+  # hn.bf0.7cb,
+  # hr.bf0.7cb,
+  hn.sz0.7,
+  hr.sz0.7, 
+  hn.szc0.7, 
+  hr.szc0.7, 
+  hn.szc0.7b,
+  # hr.szc0.7b,
+  output="plain") 
+tab.ft0.7 <-  model.table.0.7km$`Key function`[which(nchar(model.table.0.7km$`Key function`) >11)]
+
+model.table.0.7km %<>% mutate(`Key function` = case_when(
+    nchar(`Key function`)>12 ~ paste0(substring(`Key function`, 1,11),"*"),
+    nchar(`Key function`) <=12 ~ `Key function`))
+# saveRDS(model_table_2km, "model_table_2km.rds")
+
+kableExtra::kable(model.table.0.7km, digits=3, row.names = FALSE, escape=FALSE,
+      caption = paste(sp, " - Comparison of half normal and hazard rate with sea state and group size. Truncation = 0.7 km.")) %>%
+  kableExtra::footnote(paste0("* ", tab.ft0.7)) %>% 
+  kableExtra::landscape()
+#--------------------------------------------------
+model.table.0.65km <- summarize_ds_models(
+hn.0.65,
+hr.0.65,
+# un.0.65,
+hn.bf0.65,
+hr.bf0.65,
+hn.bf0.65c,
+hr.bf0.65c,
+hn.bf0.65cb,
+hr.bf0.65cb,
+hn.sz0.65,
+hr.sz0.65,
+hn.szc0.65,
+hr.szc0.65,
+hn.szc0.65b,
+hr.szc0.65b,
+                                   output="plain")
+tab.ft0.65 <-  model.table.0.65km$`Key function`[which(nchar(model.table.0.65km$`Key function`) >11)]
+
+model.table.0.65km %<>% mutate(`Key function` = case_when(
+    nchar(`Key function`)>12 ~ paste0(substring(`Key function`, 1,11),"*"),
+    nchar(`Key function`) <=12 ~ `Key function`))
+# saveRDS(model_table_2km, "model_table_2km.rds")
+
+kableExtra::kable(model.table.0.65km, digits=3, row.names = FALSE, escape=FALSE,
+      caption = paste(sp, " - Comparison of half normal and hazard rate with sea state and group size. Truncation = 0.65 km.")) %>%
+  kableExtra::footnote(paste0("* ", tab.ft0.65)) %>%
+  kableExtra::landscape()
+```
+
+\newpage
+
+## Glare 
+Or Glare:
+
+```{r Glare}
+table(df1$Glare90)
+
+file <- paste0(dir,"hp_hn_hr_sz",survey_title)
+if(!rerun & file.exists(file)){
+  load(file)
+}else{
+
+hn.gl1 <- ds(data=df, truncation=1, key="hn", adjustment=NULL, formula=~Glare90)
+hr.gl1 <- ds(data=df, truncation=1, key="hr", adjustment=NULL, formula=~Glare90)
+hn.gl0.8 <- ds(data=df, truncation=0.8, key="hn", adjustment=NULL, formula=~Glare90)
+hr.gl0.8 <- ds(data=df, truncation=0.8, key="hr", adjustment=NULL, formula=~Glare90)
+hn.gl0.7 <- ds(data=df, truncation=0.7, key="hn", adjustment=NULL, formula=~Glare90)
+hr.gl0.7 <- ds(data=df, truncation=0.7, key="hr", adjustment=NULL, formula=~Glare90)
+hn.gl0.65 <- ds(data=df, truncation=0.65, key="hn", adjustment=NULL, formula=~Glare90)
+hr.gl0.65 <- ds(data=df, truncation=0.65, key="hr", adjustment=NULL, formula=~Glare90)
+
+hn.gl45.1 <- ds(data=df, truncation=1, key="hn", adjustment=NULL, formula=~Glare45)
+hr.gl45.1 <- ds(data=df, truncation=1, key="hr", adjustment=NULL, formula=~Glare45)
+hn.gl45.0.8 <- ds(data=df, truncation=0.8, key="hn", adjustment=NULL, formula=~Glare45)
+hr.gl45.0.8 <- ds(data=df, truncation=0.8, key="hr", adjustment=NULL, formula=~Glare45)
+hn.gl45.0.7 <- ds(data=df, truncation=0.7, key="hn", adjustment=NULL, formula=~Glare45)
+hr.gl45.0.7 <- ds(data=df, truncation=0.7, key="hr", adjustment=NULL, formula=~Glare45)
+hn.gl45.0.65 <- ds(data=df, truncation=0.65, key="hn", adjustment=NULL, formula=~Glare45)
+hr.gl45.0.65 <- ds(data=df, truncation=0.65, key="hr", adjustment=NULL, formula=~Glare45)
+
+save(hn.gl1 ,
+     hr.gl1 ,
+     hn.gl0.8 ,
+     hr.gl0.8 ,
+     hn.gl0.7 ,
+     hr.gl0.7 ,
+     hn.gl0.65,
+     hr.gl0.65,
+     hn.gl45.1 ,
+     hr.gl45.1 ,
+     hn.gl45.0.8 ,
+     hr.gl45.0.8 ,
+     hn.gl45.0.7 ,
+     hr.gl45.0.7 ,
+     hn.gl45.0.65,
+     hr.gl45.0.65,
+     file=file)
+}
+
+# par(mfrow=c(1,2))
+# p_dist_table(hn.sz2) %>% kableExtra::kable()
+# p_dist_table(hr.sz2)%>% kableExtra::kable()
+
+par(mfrow=c(1,2))
+plot_df(sp, hn.gl0.8)
+plot_df(sp, hr.gl0.8)
+
+par(mfrow=c(1,2))
+gof_ds(hn.gl0.8, main="hn.gl0.8")
+gof_ds(hr.gl0.8, main="hr.gl0.8")
+
+
+par(mfrow=c(1,2))
+# p_dist_table(hn.sz0.7) %>% kableExtra::kable()
+# p_dist_table(hr.sz0.65)%>% kableExtra::kable()
+
+par(mfrow=c(1,2))
+plot_df(sp, hn.gl0.7)
+plot_df(sp, hr.gl0.7)
+
+par(mfrow=c(1,2))
+
+gof_ds(hn.gl0.7, main="hn.gl0.7")
+gof_ds(hr.gl0.7, main="hr.gl0.7")
+
+#------------------------------------------------------------------------
+# yes/no glare
+table(df1$Glare90)
+
+file <- paste0(dir,"hp_hn_hr_sz",survey_title)
+if(!rerun & file.exists(file)){
+  load(file)
+}else{
+
+hn.gl1y <- ds(data=df, truncation=1, key="hn", adjustment=NULL, formula=~Glare90y)
+hr.gl1y <- ds(data=df, truncation=1, key="hr", adjustment=NULL, formula=~Glare90y)
+hn.gl0.8y <- ds(data=df, truncation=0.8, key="hn", adjustment=NULL, formula=~Glare90y)
+hr.gl0.8y <- ds(data=df, truncation=0.8, key="hr", adjustment=NULL, formula=~Glare90y)
+hn.gl0.7y <- ds(data=df, truncation=0.7, key="hn", adjustment=NULL, formula=~Glare90y)
+hr.gl0.7y <- ds(data=df, truncation=0.7, key="hr", adjustment=NULL, formula=~Glare90y)
+hn.gl0.65y <- ds(data=df, truncation=0.65, key="hn", adjustment=NULL, formula=~Glare90y)
+hr.gl0.65y <- ds(data=df, truncation=0.65, key="hr", adjustment=NULL, formula=~Glare90y)
+
+hn.gl45.1y <- ds(data=df, truncation=1, key="hn", adjustment=NULL, formula=~Glare45y)
+hr.gl45.1y <- ds(data=df, truncation=1, key="hr", adjustment=NULL, formula=~Glare45y)
+hn.gl45.0.8y <- ds(data=df, truncation=0.8, key="hn", adjustment=NULL, formula=~Glare45y)
+hr.gl45.0.8y <- ds(data=df, truncation=0.8, key="hr", adjustment=NULL, formula=~Glare45y)
+hn.gl45.0.7y <- ds(data=df, truncation=0.7, key="hn", adjustment=NULL, formula=~Glare45y)
+hr.gl45.0.7y <- ds(data=df, truncation=0.7, key="hr", adjustment=NULL, formula=~Glare45y)
+hn.gl45.0.65y <- ds(data=df, truncation=0.65, key="hn", adjustment=NULL, formula=~Glare45y)
+hr.gl45.0.65y <- ds(data=df, truncation=0.65, key="hr", adjustment=NULL, formula=~Glare45y)
+
+save(hn.gl1y ,
+     hr.gl1y ,
+     hn.gl0.8y ,
+     hr.gl0.8y ,
+     hn.gl0.7y ,
+     hr.gl0.7y ,
+     hn.gl0.65y,
+     hr.gl0.65y,
+     hn.gl45.1y ,
+     hr.gl45.1y ,
+     hn.gl45.0.8y ,
+     hr.gl45.0.8y ,
+     hn.gl45.0.7y ,
+     hr.gl45.0.7y ,
+     hn.gl45.0.65y,
+     hr.gl45.0.65y,
+     file=file)
+}
+
+
+```
+
+\newpage
+## Swell
+Or swell, for which data were collected as categorical: Big, Moderate, Low, or None. Swell data were grouped for analysis as Mod-Big, Low or None.
+
+```{r swell}
+# x <- df %>% filter(iteration<19)
+table(df$swell)
+# table(x$swell)
+# hn.sw1 <- ds(data=df, truncation=1, key="hn", formula=~swell)
+# hr.sw1 <- ds(data=df, truncation=1, key="hr", formula=~swell)
+# # par(mfrow=c(1,2))
+# # p_dist_table(hn.sz2) %>% kableExtra::kable()
+# # p_dist_table(hr.sz2)%>% kableExtra::kable()
+# 
+# par(mfrow=c(1,2))
+# plot_df(sp, hn.sw1)
+# plot_df(sp, hr.sw1)
+# 
+# par(mfrow=c(1,2))
+# gof_ds(hn.sw1, main="hn.sw1")
+# gof_ds(hr.sw1, main="hr.sw1")
+
+
+#------------------------------------
+file <- paste0(dir,"hp_hn_hr_sz",survey_title)
+if(!rerun & file.exists(file)){
+  load(file)
+}else{
+
+hn.sw1 <- ds(data=df, truncation=1, key="hn", formula=~swell)
+hr.sw1 <- ds(data=df, truncation=1, key="hr", formula=~swell)
+hn.sw0.8 <- ds(data=df, truncation=0.8, key="hn", formula=~swell)
+hr.sw0.8 <- ds(data=df, truncation=0.8, key="hr", formula=~swell)
+hn.sw0.7 <- ds(data=df, truncation=0.7, key="hn", formula=~swell)
+hr.sw0.7 <- ds(data=df, truncation=0.7, key="hr", formula=~swell)
+hn.sw0.65 <- ds(data=df, truncation=0.65, key="hn", formula=~swell)
+hr.sw0.65 <- ds(data=df, truncation=0.65, key="hr", formula=~swell)
+
+save(hn.sw1 ,
+     hr.sw1 ,
+     hn.sw0.8 ,
+     hr.sw0.8 ,
+     hn.sw0.7 ,
+     hr.sw0.7 ,
+     hn.sw0.65,
+     hr.sw0.65,
+     file=file)
+}
+
+par(mfrow=c(1,2))
+plot_df(sp, hn.sw1)
+plot_df(sp, hr.sw1)
+
+par(mfrow=c(1,2))
+plot_df(sp, hn.sw0.8)
+plot_df(sp, hr.sw0.8)
+
+par(mfrow=c(1,2))
+gof_ds(hn.sw1, main="hn.sw1")
+gof_ds(hr.sw1, main="hr.sw1")
+
+par(mfrow=c(1,2))
+gof_ds(hn.sw0.8, main="hn.sw0.8")
+gof_ds(hr.sw0.8, main="hr.sw0.8")
+
+#------------------------------------
+
+# par(mfrow=c(1,2)
+# p_dist_table(hn.sz0.7) %>% kableExtra::kable()
+# p_dist_table(hr.sz0.7)%>% kableExtra::kable()
+
+par(mfrow=c(1,2))
+plot_df(sp, hn.sw0.7)
+plot_df(sp, hr.sw0.7)
+
+par(mfrow=c(1,2))
+gof_ds(hn.sw0.7, main="hn.sw0.7")
+gof_ds(hr.sw0.7, main="hr.sw0.7")
+
+par(mfrow=c(1,2))
+plot_df(sp, hn.sw0.65)
+plot_df(sp, hr.sw0.65)
+
+par(mfrow=c(1,2))
+gof_ds(hn.sw0.65, main="hn.sw0.65")
+gof_ds(hr.sw0.65, main="hr.sw0.65")
+#------------------------------------
+# hn.sw0.65 <- ds(data=df, truncation=0.65, key="hn", formula=~swell)
+# hr.sw0.65 <- ds(data=df, truncation=0.65, key="hr", formula=~swell)
+# # par(mfrow=c(1,2)
+# # p_dist_table(hn.sz0.65) %>% kableExtra::kable()
+# # p_dist_table(hr.sz0.65)%>% kableExtra::kable()
+# 
+# par(mfrow=c(1,2))
+# plot_df(sp, hn.sw0.65)
+# plot_df(sp, hr.sw0.65)
+# 
+# par(mfrow=c(1,2))
+# gof_ds(hn.sw0.65, main="hn.sw0.65")
+# gof_ds(hr.sw0.65, main="hr.sw0.65")
+
+```
+
+\newpage
+
+## Visibility
+Visibility data were collected as categorical: G/E, Moderate, Poor. Moderate and Poor categories were grouped for analysis.
+
+```{r vis}
+df <- df %>% mutate(vis=Clumped_Vis)
+table(df$vis)
+
+# vis1 <- df %>% filter(distance < 1)
+# vis0.8 <- df %>% filter(distance < 0.8)
+# vis0.7 <- df %>% filter(distance < 0.7)
+# vis0.65 <- df %>% filter(distance < 0.65)
+
+file <- paste0(dir,"hp_hn_hr_vis",survey_title)
+if(!rerun & file.exists(file)){
+  load(file)
+}else{
+
+hn.v1 <- ds(data=df, truncation=1, key="hn", formula=~vis)
+hr.v1 <- ds(data=df, truncation=1, key="hr", formula=~vis)
+hn.v0.8 <- ds(data=df, truncation=0.8, key="hn", formula=~vis)
+hr.v0.8 <- ds(data=df, truncation=0.8, key="hr", formula=~vis)
+hn.v0.7 <- ds(data=df, truncation=0.7, key="hn", formula=~vis)
+hr.v0.7 <- ds(data=df, truncation=0.7, key="hr", formula=~vis)
+hn.v0.65 <- ds(data=df, truncation=0.65, key="hn", formula=~vis)
+hr.v0.65 <- ds(data=df, truncation=0.65, key="hr", formula=~vis)
+
+save(hn.v1 ,
+     hr.v1 ,
+     hn.v0.8 ,
+     hr.v0.8 ,
+     hn.v0.7 ,
+     hr.v0.7 ,
+     hn.v0.65,
+     hr.v0.65,
+     file=file)
+} 
+
+#----------------------------------------------------------------
+par(mfrow=c(1,2))
+plot_df(sp, hn.v1)
+plot_df(sp, hr.v1)
+par(mfrow=c(1,2))
+gof_ds(hn.v1, main="hn.v1")
+gof_ds(hr.v1, main="hr.v1")
+#----------------------------------------------------------------
+par(mfrow=c(1,2))
+plot_df(sp, hn.v0.8)
+plot_df(sp, hr.v0.8)
+par(mfrow=c(1,2))
+gof_ds(hn.v0.8, main="hn.v0.8")
+gof_ds(hr.v0.8, main="hr.v0.8")
+#----------------------------------------------------------------
+
+par(mfrow=c(1,2))
+plot_df(sp, hn.v0.7)
+plot_df(sp, hr.v0.7)
+par(mfrow=c(1,2))
+gof_ds(hn.v0.7, main="hn.v0.7")
+gof_ds(hr.v0.7, main="hr.v0.7")
+#----------------------------------------------------------------
+
+par(mfrow=c(1,2))
+plot_df(sp, hn.v0.65)
+plot_df(sp, hr.v0.65)
+par(mfrow=c(1,2))
+gof_ds(hn.v0.65, main="hn.v0.65")
+gof_ds(hr.v0.65, main="hr.v0.65")
+#----------------------------------------------------------------
+
+```
+
+\newpage
+
+## Observer
+
+```{r obs}
+df$SightedBy <- df$Observer
+df %<>% mutate(SightedBy = case_when(
+  SightedBy == "CMcMillan" ~ "a",
+  SightedBy == "EKeppel" ~"b",
+  SightedBy == "LSpaven" ~"c"))
+df2 <- df %>% filter(distance<=0.8)
+table(df2$SightedBy)
+file <- paste0(dir,"hp_hn_hr_vis",survey_title)
+if(!rerun & file.exists(file)){
+  load(file)
+}else{
+
+hn.obs1 <- ds(data=df, truncation=1, key="hn", formula=~SightedBy)
+hr.obs1 <- ds(data=df, truncation=1, key="hr", formula=~SightedBy)
+hn.obs0.8 <- ds(data=df, truncation=0.8, key="hn", formula=~SightedBy)
+hr.obs0.8 <- ds(data=df, truncation=0.8, key="hr", formula=~SightedBy)
+hn.obs0.7 <- ds(data=df, truncation=0.7, key="hn", formula=~SightedBy)
+hr.obs0.7 <- ds(data=df, truncation=0.7, key="hr", formula=~SightedBy)
+hn.obs0.65 <- ds(data=df, truncation=0.65, key="hn", formula=~SightedBy)
+hr.obs0.65 <- ds(data=df, truncation=0.65, key="hr", formula=~SightedBy)
+
+
+save(hn.obs1 ,
+     hr.obs1 ,
+     hn.obs0.8 ,
+     hr.obs0.8 ,
+     hn.obs0.7 ,
+     hr.obs0.7 ,
+     hn.obs0.65,
+     hr.obs0.65,
+     file=file)
+} 
+
+par(mfrow=c(1,2))
+plot_df(sp, hn.obs1)
+plot_df(sp, hr.obs1)
+par(mfrow=c(1,2))
+gof_ds(hn.obs1, main="hn.obs1")
+gof_ds(hr.obs1, main="hr.obs1")
+
+#----------------------------------------------------------------
+par(mfrow=c(1,2))
+plot_df(sp, hn.obs0.8)
+plot_df(sp, hr.obs0.8)
+par(mfrow=c(1,2))
+gof_ds(hn.obs0.8, main="hn.obs0.8")
+gof_ds(hr.obs0.8, main="hr.obs0.8")
+#----------------------------------------------------------------
+
+par(mfrow=c(1,2))
+plot_df(sp, hn.obs0.7)
+plot_df(sp, hr.obs0.7)
+par(mfrow=c(1,2))
+gof_ds(hn.obs0.7, main="hn.obs0.7")
+gof_ds(hr.obs0.7, main="hr.obs0.7")
+#----------------------------------------------------------------
+
+par(mfrow=c(1,2))
+plot_df(sp, hn.obs0.65)
+plot_df(sp, hr.obs0.65)
+par(mfrow=c(1,2))
+gof_ds(hn.obs0.65, main="hn.obs0.65")
+gof_ds(hr.obs0.65, main="hr.obs0.65")
+```
+
+\newpage
+
+## Compare single covariate models
+We can also examine the combined (additive) effects of observed group size, Beaufort and swell:
+
+```{r single_cov}
+# model.table.1km <- summarize_ds_models(
+#   hn.1,
+#   hr.1,
+#   un.1,
+#   hn.obs1,
+# hr.obs1,
+#   hn.bf1,
+#   hr.bf1,
+#   # hn.bf1c,
+#   # hr.bf1c,
+# hn.szc1,
+# hr.szc1,
+# hn.gl1 ,
+# hr.gl1 ,
+# hn.gl45.1 ,
+# hr.gl45.1 ,
+# hn.gl1y ,
+# hr.gl1y ,
+# hn.gl45.1y ,
+# hr.gl45.1y ,
+#   hn.sw1, 
+#   hr.sw1, 
+#   hn.v1,
+#   hr.v1,
+#     # hn.sz1,
+#   # hr.sz1,
+#  # hn.bf1cb,
+#   # hr.bf1cb,
+# # hn.szc1b,
+#   # hr.szc1b,
+#   output="plain") 
+# tab.ft1 <-  model.table.1km$`Key function`[which(nchar(model.table.1km$`Key function`) >11)]
+# 
+# model.table.1km %<>% mutate(`Key function` = case_when(
+#     nchar(`Key function`)>12 ~ paste0(substring(`Key function`, 1,11),"*"),
+#     nchar(`Key function`) <=12 ~ `Key function`))
+# 
+# kableExtra::kable(model.table.1km, digits=3, row.names = FALSE, escape=FALSE,
+#       caption = paste(sp, " - Comparison of half normal and hazard rate with single covariates. Truncation = 1 km.")) %>%
+#   kableExtra::footnote(paste0("* ", tab.ft1)) %>% 
+#   kableExtra::landscape()
+#----------------------------------------------------
+model.table.0.8km <- summarize_ds_models(
+  hn.0.8,
+  hr.0.8,
+  un.0.8,
+  hn.obs0.8,
+hr.obs0.8,
+  hn.bf0.8,
+  hr.bf0.8,
+  # hn.bf0.8c,
+  # hr.bf0.8c,
+hn.szc0.8,
+hr.szc0.8,
+hn.gl0.8 ,
+hr.gl0.8 ,
+hn.gl45.0.8 ,
+hr.gl45.0.8 ,
+hn.gl0.8y ,
+hr.gl0.8y ,
+hn.gl45.0.8y ,
+hr.gl45.0.8y ,
+  hn.sw0.8, 
+  hr.sw0.8, 
+  hn.v0.8,
+  hr.v0.8,
+    # hn.sz0.8,
+  # hr.sz0.8,
+ # hn.bf0.8cb,
+  # hr.bf0.8cb,
+# hn.szc0.8b,
+  # hr.szc0.8b,
+  output="plain") 
+tab.ft0.8 <-  model.table.0.8km$`Key function`[which(nchar(model.table.0.8km$`Key function`) >11)]
+
+model.table.0.8km %<>% mutate(`Key function` = case_when(
+    nchar(`Key function`)>12 ~ paste0(substring(`Key function`, 1,11),"*"),
+    nchar(`Key function`) <=12 ~ `Key function`))
+
+kableExtra::kable(model.table.0.8km, digits=3, row.names = FALSE, escape=FALSE,
+      caption = paste(sp, " - Comparison of half normal and hazard rate with single covariates. Truncation = 0.8 km.")) %>%
+  kableExtra::footnote(paste0("* ", tab.ft0.8)) %>% 
+  kableExtra::landscape()
+#---------------------------------------
+model.table.0.7km <- summarize_ds_models(
+hn.0.7, 
+hr.0.7, 
+un.0.7,
+hn.obs0.7 ,
+hr.obs0.7 ,
+hn.bf0.7,
+hr.bf0.7,
+
+# hn.bf0.7c,
+# hr.bf0.7c,
+
+hn.sz0.7,
+hr.sz0.7,
+hn.szc0.7, 
+hr.szc0.7, 
+
+  hn.v0.7,
+  hr.v0.7,
+hn.gl0.7 ,
+hr.gl0.7 ,
+hn.gl45.0.7 ,
+hr.gl45.0.7 ,
+hn.gl0.7y ,
+hr.gl0.7y ,
+hn.gl45.0.7y ,
+hr.gl45.0.7y ,
+  hn.sw0.7, 
+  hr.sw0.7, 
+
+  # hn.sz0.8,
+  # hr.sz0.8,
+# hn.bf0.7cb,
+# hr.bf0.7cb,
+# hn.szc0.7b,
+# hr.szc0.7b,
+                                   output="plain") 
+tab.ft0.7 <-  model.table.0.7km$`Key function`[which(nchar(model.table.0.7km$`Key function`) >11)]
+
+model.table.0.7km %<>% mutate(`Key function` = case_when(
+    nchar(`Key function`)>12 ~ paste0(substring(`Key function`, 1,11),"*"),
+    nchar(`Key function`) <=12 ~ `Key function`))
+# saveRDS(model_table_2km, "model_table_2km.rds")
+
+kableExtra::kable(model.table.0.7km, digits=3, row.names = FALSE, escape=FALSE,
+      caption = paste(sp, " - Comparison of half normal and hazard rate with single covariates. Truncation = 0.7 km.")) %>%
+  kableExtra::footnote(paste0("* ", tab.ft0.7)) %>% 
+  kableExtra::landscape()
+#---------------------------------------
+# model.table.0.65km <- summarize_ds_models(
+# hn.0.65, 
+# hr.0.65, 
+# un.0.65,
+# hn.obs0.65 ,
+# hr.obs0.65 ,
+# hn.bf0.65,
+# hr.bf0.65,
+# # hn.bf0.65c,
+# # hr.bf0.65c,
+# 
+# hn.sz0.65,
+# hr.sz0.65,
+# hn.szc0.65, 
+# hr.szc0.65, 
+# 
+#   hn.v0.65,
+#   hr.v0.65,
+# hn.gl0.65 ,
+# hr.gl0.65 ,
+# hn.gl45.0.65 ,
+# hr.gl45.0.65 ,
+# hn.gl1y ,
+# hr.gl1y ,
+# hn.gl0.65y ,
+# hr.gl0.65y ,
+# hn.gl45.0.65y ,
+# hr.gl45.0.65y ,
+#   hn.sw0.65, 
+#   hr.sw0.65, 
+#   # hn.sz0.8,
+#   # hr.sz0.8,
+# # hn.bf0.65cb,
+# # hr.bf0.65cb,
+# # hn.szc0.65b,
+# # hr.szc0.65b,
+#                                    output="plain") 
+# tab.ft0.65 <-  model.table.0.65km$`Key function`[which(nchar(model.table.0.65km$`Key function`) >11)]
+# 
+# model.table.0.65km %<>% mutate(`Key function` = case_when(
+#     nchar(`Key function`)>12 ~ paste0(substring(`Key function`, 1,11),"*"),
+#     nchar(`Key function`) <=12 ~ `Key function`))
+# # saveRDS(model_table_2km, "model_table_2km.rds")
+# 
+# kableExtra::kable(model.table.0.65km, digits=3, row.names = FALSE, escape=FALSE,
+#       caption = paste(sp, " - Comparison of half normal and hazard rate with single covariates. Truncation = 0.65 km.")) %>%
+#   kableExtra::footnote(paste0("* ", tab.ft0.65)) %>% 
+#   kableExtra::landscape()
+
+
+
+```
+\newpage
+
+## Combinations of top covariates (beaufort, observer, group size)
+We can also examine the combined (additive) effects of covariates.
+
+```{r combine other factors}
+hn.obs.v1    <- ds(data=df, truncation=1, key="hn", formula=~SightedBy+vis)
+hr.obs.v1    <- ds(data=df, truncation=1, key="hr", formula=~SightedBy+vis)
+hn.obs.bfc1   <- ds(data=df, truncation=1, key="hn", formula=~SightedBy+bfc)
+hr.obs.bfc1   <- ds(data=df, truncation=1, key="hr", formula=~SightedBy+bfc)
+hn.v.bfc1     <- ds(data=df, truncation=1, key="hn", formula=~vis+bfc)
+hr.v.bfc1     <- ds(data=df, truncation=1, key="hr", formula=~vis+bfc)
+hn.obs.v.bfc1 <- ds(data=df, truncation=1, key="hn", formula=~SightedBy+vis+bfc)
+hr.obs.v.bfc1 <- ds(data=df, truncation=1, key="hr", formula=~SightedBy+vis+bfc)
+
+hn.obs.szc0.8    <- ds(data=df, truncation=0.8, key="hn", formula=~SightedBy+szc)
+hr.obs.szc0.8    <- ds(data=df, truncation=0.8, key="hr", formula=~SightedBy+szc)
+hn.obs.bf0.8   <- ds(data=df, truncation=0.8, key="hn", formula=~SightedBy+Beaufort)
+hr.obs.bf0.8   <- ds(data=df, truncation=0.8, key="hr", formula=~SightedBy+Beaufort)
+hn.szc.bf0.8     <- ds(data=df, truncation=0.8, key="hn", formula=~szc+Beaufort)
+hr.szc.bf0.8     <- ds(data=df, truncation=0.8, key="hr", formula=~szc+Beaufort)
+# hn.obs.v.bf0.8 <- ds(data=df, truncation=0.8, key="hn", formula=~SightedBy+vis+bf)
+# hr.obs.v.bf0.8 <- ds(data=df, truncation=0.8, key="hr", formula=~SightedBy+vis+bf)
+
+hn.obs.szc0.7   <- ds(data=df, truncation=0.7, key="hn", formula=~SightedBy+szc)
+hr.obs.szc0.7   <- ds(data=df, truncation=0.7, key="hr", formula=~SightedBy+szc)
+hn.obs.bf0.7   <- ds(data=df, truncation=0.7, key="hn", formula=~SightedBy+Beaufort)
+hr.obs.bf0.7   <- ds(data=df, truncation=0.7, key="hr", formula=~SightedBy+Beaufort)
+hn.szc.bf0.7   <- ds(data=df, truncation=0.7, key="hn", formula=~szc+Beaufort)
+hr.szc.bf0.7   <- ds(data=df, truncation=0.7, key="hr", formula=~szc+Beaufort)
+# hn.obs.v.bfc0.7 <- ds(data=df, truncation=0.7, key="hn", formula=~SightedBy+vis+bfc)
+# hr.obs.v.bfc0.7 <- ds(data=df, truncation=0.7, key="hr", formula=~SightedBy+vis+bfc)
+
+hn.obs.v0.65    <- ds(data=df, truncation=0.65, key="hn", formula=~SightedBy+vis)
+hr.obs.v0.65    <- ds(data=df, truncation=0.65, key="hr", formula=~SightedBy+vis)
+hn.obs.bfc0.65   <- ds(data=df, truncation=0.65, key="hn", formula=~SightedBy+bfc)
+hr.obs.bfc0.65   <- ds(data=df, truncation=0.65, key="hr", formula=~SightedBy+bfc)
+hn.v.bfc0.65     <- ds(data=df, truncation=0.65, key="hn", formula=~vis+bfc)
+hr.v.bfc0.65     <- ds(data=df, truncation=0.65, key="hr", formula=~vis+bfc)
+hn.obs.v.bfc0.65 <- ds(data=df, truncation=0.65, key="hn", formula=~SightedBy+vis+bfc)
+hr.obs.v.bfc0.65 <- ds(data=df, truncation=0.65, key="hr", formula=~SightedBy+vis+bfc)
+```
+
+
+
+```{r beau-size-swell}
+# hn.bf.sz1 <- ds(data=df, truncation=1, key="hn", formula=~Beaufort+GroupSize)
+# hr.bf.sz1 <- ds(data=df, truncation=1, key="hr", formula=~Beaufort+GroupSize)
+# hn.bfcb.sz1 <- ds(data=df, truncation=1, key="hn", formula=~bfcb+GroupSize)
+# hr.bfcb.sz1 <- ds(data=df, truncation=1, key="hr", formula=~bfcb+GroupSize)
+# hn.bfc.sz1 <- ds(data=df, truncation=1, key="hn", formula=~bfc+GroupSize)
+# hr.bfc.sz1 <- ds(data=df, truncation=1, key="hr", formula=~bfc+GroupSize)
+# par(mfrow=c(1,2))
+# plot_df(sp, hn.bf.sz1)
+# plot_df(sp, hr.bf.sz1)
+# par(mfrow=c(1,2))
+# gof_ds(hn.bf.sz1, main="hn.bf.sz1")
+# gof_ds(hr.bf.sz1, main="hr.bf.sz1")
+# 
+# hn.sz.sw1 <- ds(data=df, truncation=1, key="hn", formula=~GroupSize+swell)
+# hr.sz.sw1 <- ds(data=df, truncation=1, key="hr", formula=~GroupSize+swell)
+# par(mfrow=c(1,2))
+# plot_df(sp, hn.sz.sw1)
+# plot_df(sp, hr.sz.sw1)
+# par(mfrow=c(1,2))
+# gof_ds(hn.sz.sw1, main="hn.sz.sw1")
+# gof_ds(hr.sz.sw1, main="hr.sz.sw1")
+# 
+# hn.bf.sw1 <- ds(data=df, truncation=1, key="hn", formula=~Beaufort+swell)
+# hr.bf.sw1 <- ds(data=df, truncation=1, key="hr", formula=~Beaufort+swell)
+# hn.bfc.sw1 <- ds(data=df, truncation=1, key="hn", formula=~bfc+swell)
+# hr.bfc.sw1 <- ds(data=df, truncation=1, key="hr", formula=~bfc+swell)
+# hn.bfcb.sw1 <- ds(data=df, truncation=1, key="hn", formula=~bfcb+swell)
+# hr.bfcb.sw1 <- ds(data=df, truncation=1, key="hr", formula=~bfcb+swell)
+# par(mfrow=c(1,2))
+# plot_df(sp, hn.bf.sw1)
+# plot_df(sp, hr.bf.sw1)
+# par(mfrow=c(1,2))
+# gof_ds(hn.bf.sw1, main="hn.bf.sw1")
+# gof_ds(hr.bf.sw1, main="hr.bf.sw1")
+# 
+# hn.bf.sz.sw1 <- ds(data=df, truncation=1, key="hn", formula=~Beaufort+GroupSize+swell)
+# hr.bf.sz.sw1 <- ds(data=df, truncation=1, key="hr", formula=~Beaufort+GroupSize+swell)
+# hn.bfc.sz.sw1 <- ds(data=df, truncation=1, key="hn",  formula=~bfc +GroupSize+swell)
+# hr.bfc.sz.sw1 <- ds(data=df, truncation=1, key="hr",  formula=~bfc +GroupSize+swell)
+# hn.bfcb.sz.sw1 <- ds(data=df, truncation=1, key="hn", formula=~bfcb+GroupSize+swell)
+# hr.bfcb.sz.sw1 <- ds(data=df, truncation=1, key="hr", formula=~bfcb+GroupSize+swell)
+# par(mfrow=c(1,2))
+# plot_df(sp, hn.bf.sz.sw1)
+# plot_df(sp, hr.bf.sz.sw1)
+# par(mfrow=c(1,2))
+# gof_ds(hn.bf.sz.sw1, main="hn.bf.sz.sw1")
+# gof_ds(hr.bf.sz.sw1, main="hr.bf.sz.sw1")
+#--------------------------------------------------------------------
+
+# hn.bf.sz0.8 <- ds(data=df, truncation=0.8, key="hn", formula=~Beaufort+GroupSize)
+# hr.bf.sz0.8 <- ds(data=df, truncation=0.8, key="hr", formula=~Beaufort+GroupSize)
+# hn.bfc.sz0.8 <- ds(data=df, truncation=0.8, key="hn", formula=~bfc +GroupSize)
+# hr.bfc.sz0.8 <- ds(data=df, truncation=0.8, key="hr", formula=~bfc +GroupSize)
+# hn.bfcb.sz0.8 <- ds(data=df, truncation=0.8, key="hn", formula=~bfcb+GroupSize)
+# hr.bfcb.sz0.8 <- ds(data=df, truncation=0.8, key="hr", formula=~bfcb+GroupSize)
+# par(mfrow=c(1,2))
+# plot_df(sp, hn.bf.sz0.8)
+# plot_df(sp, hr.bf.sz0.8)
+# par(mfrow=c(1,2))
+# gof_ds(hn.bf.sz0.8, main="hn.bf.sz0.8")
+# gof_ds(hr.bf.sz0.8, main="hr.bf.sz0.8")
+# 
+# hn.sz.sw0.8 <- ds(data=df, truncation=0.8, key="hn", formula=~GroupSize+swell)
+# hr.sz.sw0.8 <- ds(data=df, truncation=0.8, key="hr", formula=~GroupSize+swell)
+# par(mfrow=c(1,2))
+# plot_df(sp, hn.sz.sw0.8)
+# plot_df(sp, hr.sz.sw0.8)
+# par(mfrow=c(1,2))
+# gof_ds(hn.sz.sw0.8, main="hn.sz.sw0.8")
+# gof_ds(hr.sz.sw0.8, main="hr.sz.sw0.8")
+# 
+# hn.bf.sw0.8 <- ds(data=df, truncation=0.8, key="hn", formula=~Beaufort+swell)
+# hr.bf.sw0.8 <- ds(data=df, truncation=0.8, key="hr", formula=~Beaufort+swell)
+# hn.bfc.sw0.8 <- ds(data=df, truncation=0.8, key="hn", formula=~bfc +swell)
+# hr.bfc.sw0.8 <- ds(data=df, truncation=0.8, key="hr", formula=~bfc +swell)
+# hn.bfcb.sw0.8 <- ds(data=df, truncation=0.8, key="hn", formula=~bfcb+swell)
+# hr.bfcb.sw0.8 <- ds(data=df, truncation=0.8, key="hr", formula=~bfcb+swell)
+# par(mfrow=c(1,2))
+# plot_df(sp, hn.bf.sw0.8)
+# plot_df(sp, hr.bf.sw0.8)
+# par(mfrow=c(1,2))
+# gof_ds(hn.bf.sw0.8, main="hn.bf.sw0.8")
+# gof_ds(hr.bf.sw0.8, main="hr.bf.sw0.8")
+
+# hn.bf.sz.sw0.8 <- ds(data=df, truncation=0.8, key="hn", formula=~Beaufort+GroupSize+swell)
+# hr.bf.sz.sw0.8 <- ds(data=df, truncation=0.8, key="hr", formula=~Beaufort+GroupSize+swell)
+# hn.bfc.sz.sw0.8 <- ds(data=df, truncation=0.8, key="hn", formula=~bfc +GroupSize+swell)
+# hr.bfc.sz.sw0.8 <- ds(data=df, truncation=0.8, key="hr", formula=~bfc +GroupSize+swell)
+# hn.bfcb.sz.sw0.8 <- ds(data=df, truncation=0.8, key="hn", formula=~bfcb+GroupSize+swell)
+# hr.bfcb.sz.sw0.8 <- ds(data=df, truncation=0.8, key="hr", formula=~bfcb+GroupSize+swell)
+# par(mfrow=c(1,2))
+# plot_df(sp, hn.bf.sz.sw0.8)
+# plot_df(sp, hr.bf.sz.sw0.8)
+# par(mfrow=c(1,2))
+# gof_ds(hn.bf.sz.sw0.8, main="hn.bf.sz.sw0.8")
+# gof_ds(hr.bf.sz.sw0.8, main="hr.bf.sz.sw0.8")
+#--------------------------------------------------------------------
+
+hn.bf.sz0.7 <- ds(data=df, truncation=0.7, key="hn", formula=~Beaufort+GroupSize)
+hr.bf.sz0.7 <- ds(data=df, truncation=0.7, key="hr", formula=~Beaufort+GroupSize)
+hn.bfc.sz0.7 <- ds(data=df, truncation=0.7, key="hn", formula=~bfc +GroupSize)
+hr.bfc.sz0.7 <- ds(data=df, truncation=0.7, key="hr", formula=~bfc +GroupSize)
+hn.bfcb.sz0.7 <- ds(data=df, truncation=0.7, key="hn", formula=~bfcb+GroupSize)
+hr.bfcb.sz0.7 <- ds(data=df, truncation=0.7, key="hr", formula=~bfcb+GroupSize)
+par(mfrow=c(1,2))
+plot_df(sp, hn.bf.sz0.7)
+plot_df(sp, hr.bf.sz0.7)
+par(mfrow=c(1,2))
+gof_ds(hn.bf.sz0.7, main="hn.bf.sz0.7")
+gof_ds(hr.bf.sz0.7, main="hr.bf.sz0.7")
+
+hn.sz.sw0.7 <- ds(data=df, truncation=0.7, key="hn", formula=~GroupSize+swell)
+hr.sz.sw0.7 <- ds(data=df, truncation=0.7, key="hr", formula=~GroupSize+swell)
+par(mfrow=c(1,2))
+plot_df(sp, hn.sz.sw0.7)
+plot_df(sp, hr.sz.sw0.7)
+par(mfrow=c(1,2))
+gof_ds(hn.sz.sw0.7, main="hn.sz.sw0.7")
+gof_ds(hr.sz.sw0.7, main="hr.sz.sw0.7")
+
+hn.bf.sw0.7 <- ds(data=df, truncation=0.7, key="hn", formula=~Beaufort+swell)
+hr.bf.sw0.7 <- ds(data=df, truncation=0.7, key="hr", formula=~Beaufort+swell)
+hn.bfc.sw0.7 <- ds(data=df, truncation=0.7, key="hn", formula=~bfc +swell)
+hr.bfc.sw0.7 <- ds(data=df, truncation=0.7, key="hr", formula=~bfc +swell)
+hn.bfcb.sw0.7 <- ds(data=df, truncation=0.7, key="hn", formula=~bfcb+swell)
+hr.bfcb.sw0.7 <- ds(data=df, truncation=0.7, key="hr", formula=~bfcb+swell)
+par(mfrow=c(1,2))
+plot_df(sp, hn.bf.sw0.7)
+plot_df(sp, hr.bf.sw0.7)
+par(mfrow=c(1,2))
+gof_ds(hn.bf.sw0.7, main="hn.bf.sw0.7")
+gof_ds(hr.bf.sw0.7, main="hr.bf.sw0.7")
+
+hn.bf.sz.sw0.7 <- ds(data=df, truncation=0.7, key="hn", formula=~Beaufort+GroupSize+swell)
+hr.bf.sz.sw0.7 <- ds(data=df, truncation=0.7, key="hr", formula=~Beaufort+GroupSize+swell)
+hn.bfc.sz.sw0.7 <- ds(data=df, truncation=0.7, key="hn", formula=~bfc +GroupSize+swell)
+hr.bfc.sz.sw0.7 <- ds(data=df, truncation=0.7, key="hr", formula=~bfc +GroupSize+swell)
+hn.bfcb.sz.sw0.7 <- ds(data=df, truncation=0.7, key="hn", formula=~bfcb+GroupSize+swell)
+hr.bfcb.sz.sw0.7 <- ds(data=df, truncation=0.7, key="hr", formula=~bfcb+GroupSize+swell)
+par(mfrow=c(1,2))
+plot_df(sp, hn.bf.sz.sw0.7)
+plot_df(sp, hr.bf.sz.sw0.7)
+par(mfrow=c(1,2))
+gof_ds(hn.bf.sz.sw0.7, main="hn.bf.sz.sw0.7")
+gof_ds(hr.bf.sz.sw0.7, main="hr.bf.sz.sw0.7")
+#--------------------------------------------------------------------
+
+# hn.bf.sz0.65 <- ds(data=df, truncation=0.65, key="hn", formula=~Beaufort+GroupSize)
+# hr.bf.sz0.65 <- ds(data=df, truncation=0.65, key="hr", formula=~Beaufort+GroupSize)
+# hn.bfc.sz0.65 <- ds(data=df, truncation=0.65, key="hn", formula=~bfc +GroupSize)
+# hr.bfc.sz0.65 <- ds(data=df, truncation=0.65, key="hr", formula=~bfc +GroupSize)
+# hn.bfcb.sz0.65 <- ds(data=df, truncation=0.65, key="hn", formula=~bfcb+GroupSize)
+# hr.bfcb.sz0.65 <- ds(data=df, truncation=0.65, key="hr", formula=~bfcb+GroupSize)
+# par(mfrow=c(1,2))
+# plot_df(sp, hn.bf.sz0.65)
+# plot_df(sp, hr.bf.sz0.65)
+# par(mfrow=c(1,2))
+# gof_ds(hn.bf.sz0.65, main="hn.bf.sz0.65")
+# gof_ds(hr.bf.sz0.65, main="hr.bf.sz0.65")
+# 
+# hn.sz.sw0.65 <- ds(data=df, truncation=0.65, key="hn", formula=~GroupSize+swell)
+# hr.sz.sw0.65 <- ds(data=df, truncation=0.65, key="hr", formula=~GroupSize+swell)
+# par(mfrow=c(1,2))
+# plot_df(sp, hn.sz.sw0.65)
+# plot_df(sp, hr.sz.sw0.65)
+# par(mfrow=c(1,2))
+# gof_ds(hn.sz.sw0.65, main="hn.sz.sw0.65")
+# gof_ds(hr.sz.sw0.65, main="hr.sz.sw0.65")
+# 
+# hn.bf.sw0.65 <- ds(data=df, truncation=0.65, key="hn", formula=~Beaufort+swell)
+# hr.bf.sw0.65 <- ds(data=df, truncation=0.65, key="hr", formula=~Beaufort+swell)
+# hn.bfc.sw0.65 <- ds(data=df, truncation=0.65, key="hn", formula=~bfc +swell)
+# hr.bfc.sw0.65 <- ds(data=df, truncation=0.65, key="hr", formula=~bfc +swell)
+# hn.bfcb.sw0.65 <- ds(data=df, truncation=0.65, key="hn", formula=~bfcb+swell)
+# hr.bfcb.sw0.65 <- ds(data=df, truncation=0.65, key="hr", formula=~bfcb+swell)
+# par(mfrow=c(1,2))
+# plot_df(sp, hn.bf.sw0.65)
+# plot_df(sp, hr.bf.sw0.65)
+# par(mfrow=c(1,2))
+# gof_ds(hn.bf.sw0.65, main="hn.bf.sw0.65")
+# gof_ds(hr.bf.sw0.65, main="hr.bf.sw0.65")
+# 
+# hn.bf.sz.sw0.65 <- ds(data=df, truncation=0.65, key="hn", formula=~Beaufort+GroupSize+swell)
+# hr.bf.sz.sw0.65 <- ds(data=df, truncation=0.65, key="hr", formula=~Beaufort+GroupSize+swell)
+# hn.bfc.sz.sw0.65 <- ds(data=df, truncation=0.65, key="hn", formula=~bfc +GroupSize+swell)
+# hr.bfc.sz.sw0.65 <- ds(data=df, truncation=0.65, key="hr", formula=~bfc +GroupSize+swell)
+# hn.bfcb.sz.sw0.65 <- ds(data=df, truncation=0.65, key="hn", formula=~bfcb+GroupSize+swell)
+# hr.bfcb.sz.sw0.65 <- ds(data=df, truncation=0.65, key="hr", formula=~bfcb+GroupSize+swell)
+# par(mfrow=c(1,2))
+# plot_df(sp, hn.bf.sz.sw0.65)
+# plot_df(sp, hr.bf.sz.sw0.65)
+# par(mfrow=c(1,2))
+# gof_ds(hn.bf.sz.sw0.65, main="hn.bf.sz.sw0.65")
+# gof_ds(hr.bf.sz.sw0.65, main="hr.bf.sz.sw0.65")
+```
+
+
+```{r final_table}
+# model.table.1km <- summarize_ds_models(
+#   hn.1,
+#   hr.1,
+#   un.1,
+#   hn.bf1,
+#   hr.bf1,
+#   hn.bf1c,
+#   hr.bf1c,
+#   hn.bf1cb,
+#   hr.bf1cb,
+#   # hn.sz1,
+#   hr.sz1,
+#   hn.szc1,
+#   hr.szc1,
+#   hn.szc1b,
+#   hr.szc1b,
+#   hn.sw1,
+#   # hn.bf.sz1,
+#   hn.bf.sw1,
+#   # hn.sz.sw1,
+#   hn.bf.sz.sw1,
+#   hr.sw1,
+#   hr.bf.sz1,
+#   hr.bf.sw1,
+#   hr.sz.sw1,
+#   hr.bf.sz.sw1,
+#   # hn.bfc.sz1 ,
+#   hr.bfc.sz1 ,
+#   # hn.bfcb.sz1,
+#   hr.bfcb.sz1,
+#   hn.bfc.sw1 ,
+#   hr.bfc.sw1 ,
+#   hn.bfcb.sw1,
+#   hr.bfcb.sw1,
+#   # hn.bfc.sz.sw1,
+#   hr.bfc.sz.sw1,
+#   # hn.bfcb.sz.sw1,
+#   hr.bfcb.sz.sw1,
+# hn.obs.v1,
+# hr.obs.v1    ,
+# hn.obs.bfc1  ,
+# hr.obs.bfc1  ,
+# hn.v.bfc1    ,
+# hr.v.bfc1    ,
+# hn.obs.v.bfc1,
+# hr.obs.v.bfc1,
+#   output="plain")
+# tab.ft1 <-  model.table.1km$`Key function`[which(nchar(model.table.1km$`Key function`) >11)]
+# 
+# model.table.1km %<>% mutate(`Key function` = case_when(
+#     nchar(`Key function`)>12 ~ paste0(substring(`Key function`, 1,11),"*"),
+#     nchar(`Key function`) <=12 ~ `Key function`))
+# 
+# kableExtra::kable(model.table.1km, digits=3, row.names = FALSE, escape=FALSE,
+#       caption = paste(sp, " - Comparison of half normal and hazard rate with sea state, group size, swell. Truncation = 1 km.")) %>%
+#   kableExtra::footnote(paste0("* ", tab.ft1)) %>%
+#   kableExtra::landscape()
+# 
+# saveRDS(model.table.1km, "model.table.hp.all.1km")
+
+#--------------------------------------------------
+# model.table.0.8km <- summarize_ds_models(
+#   hn.0.8,
+#   hr.0.8,
+#   un.0.8,
+#   hn.bf0.8,
+#   hr.bf0.8,
+#   # hn.bf0.8c,
+#   # hr.bf0.8c,
+#   # hn.bf0.8cb,
+#   # hr.bf0.8cb,
+#               # hn.sz0.8,
+#   hr.sz0.8,
+#   hn.szc0.8,
+#   hr.szc0.8,
+#   hn.szc0.8b,
+#   # hr.szc0.8b,
+#   hr.sw0.8,
+#   hn.sw0.8,
+#   hn.v0.8,
+#   hr.v0.8,
+#   
+#   hn.gl0.8,
+#   hr.gl0.8,
+#   hn.obs0.8 ,
+#   hr.obs0.8 ,
+#   
+#   hn.obs.szc0.8,
+# hr.obs.szc0.8,
+# hn.obs.bf0.8,
+# hr.obs.bf0.8,
+# hn.szc.bf0.8,
+# hr.szc.bf0.8,
+#   
+# #   hn.bf.sz0.8,
+# #   hn.bf.sw0.8,
+# #   hn.sz.sw0.8,
+# #   # hn.bf.sz.sw0.8,
+# #   hr.bf.sz0.8,
+# #   hr.bf.sw0.8,
+# #   hr.sz.sw0.8,
+# #   # hr.bf.sz.sw0.8,
+# #               # hn.bfc.sz0.8,
+# #   hr.bfc.sz0.8,
+# #              # hn.bfcb.sz0.8,
+# #   hr.bfcb.sz0.8,
+# #   hn.bfc.sw0.8 ,
+# #   hr.bfc.sw0.8 ,
+# #   hn.bfcb.sw0.8,
+# #   hr.bfcb.sw0.8,
+# #   # hn.bfc.sz.sw0.8,
+# #   # hr.bfc.sz.sw0.8,
+# #               # hn.bfcb.sz.sw0.8,
+# #   # hr.bfcb.sz.sw0.8,
+# # hn.obs.v0.8,    
+# # hr.obs.v0.8    ,
+# # hn.obs.bfc0.8  ,
+# # hr.obs.bfc0.8  ,
+# # hn.v.bfc0.8    ,
+# # hr.v.bfc0.8    ,
+# # # hn.obs.v.bfc0.8,
+# # # hr.obs.v.bfc0.8,
+#   output="plain") 
+# tab.ft0.8 <-  model.table.0.8km$`Key function`[which(nchar(model.table.0.8km$`Key function`) >11)]
+# 
+# model.table.0.8km %<>% mutate(`Key function` = case_when(
+#     nchar(`Key function`)>12 ~ paste0(substring(`Key function`, 1,11),"*"),
+#     nchar(`Key function`) <=12 ~ `Key function`))
+# # saveRDS(model_table_2km, "model_table_2km.rds")
+
+#--------------------------------------------------
+model.table.0.7km <- summarize_ds_models(
+  hn.0.7, 
+  hr.0.7, 
+  un.0.7,
+  hn.bf0.7,
+  hr.bf0.7,
+  # hn.bf0.7c,
+  # hr.bf0.7c,
+  # hn.bf0.7cb,
+  # hr.bf0.7cb,    
+  # hn.sz0.7,
+  # hr.sz0.7, 
+  hn.szc0.7, 
+  hr.szc0.7, 
+  hn.gl0.7, 
+  hr.gl0.7, 
+  hn.obs0.7, 
+  hr.obs0.7, 
+  # hn.szc0.7b,
+  # hr.szc0.7b,
+  
+  hn.sw0.7,
+  hr.sw0.7,
+  hn.v0.7,
+  hr.v0.7,
+  
+  hn.obs.szc0.7,
+hr.obs.szc0.7,
+hn.obs.bf0.7,
+hr.obs.bf0.7,
+hn.szc.bf0.7,
+hr.szc.bf0.7,
+
+#   hn.bf.sz0.7,
+#   hn.bf.sw0.7,
+#   hn.sz.sw0.7,
+#   # hn.bf.sz.sw0.7, 
+#   hr.bf.sz0.7,
+#   hr.bf.sw0.7,
+#   hr.sz.sw0.7,
+#   # hr.bf.sz.sw0.7,
+#   hn.bfc.sz0.7 ,
+#   hr.bfc.sz0.7 ,
+#   hn.bfcb.sz0.7,
+#   hr.bfcb.sz0.7,
+#   hn.bfc.sw0.7 ,
+#   hr.bfc.sw0.7 ,
+#   hn.bfcb.sw0.7,
+#   hr.bfcb.sw0.7,
+#   # hn.bfc.sz.sw0.7,
+#   # hr.bfc.sz.sw0.7,
+#   # hn.bfcb.sz.sw0.7,
+#   # hr.bfcb.sz.sw0.7,
+# hn.obs.v0.7,    
+# hr.obs.v0.7    ,
+# hn.obs.bfc0.7  ,
+# hr.obs.bfc0.7  ,
+# hn.v.bfc0.7    ,
+# hr.v.bfc0.7    ,
+# # hn.obs.v.bfc0.7,
+# # hr.obs.v.bfc0.7,
+  output="plain") 
+tab.ft0.7 <-  model.table.0.7km$`Key function`[which(nchar(model.table.0.7km$`Key function`) >11)]
+
+model.table.0.7km %<>% mutate(`Key function` = case_when(
+    nchar(`Key function`)>12 ~ paste0(substring(`Key function`, 1,11),"*"),
+    nchar(`Key function`) <=12 ~ `Key function`))
+# saveRDS(model_table_2km, "model_table_2km.rds")
+
+kableExtra::kable(model.table.0.7km, digits=3, row.names = FALSE, escape=FALSE,
+      caption = paste(sp, " - Comparison of half normal and hazard rate with sea state and group size. Truncation = 0.7 km.")) %>%
+  kableExtra::footnote(paste0("* ", tab.ft0.7)) %>% 
+  kableExtra::landscape()
+
+# kableExtra::kable(model.table.0.8km, digits=3, row.names = FALSE, escape=FALSE,
+#       caption = paste(sp, " - Comparison of half normal and hazard rate with sea state and group size. Truncation = 0.8 km.")) %>%
+#   kableExtra::footnote(paste0("* ", tab.ft0.8)) %>% 
+#   kableExtra::landscape()
+
+#--------------------------------------------------
+# model.table.0.65km <- summarize_ds_models(
+# hn.0.65,
+# hr.0.65,
+# un.0.65,
+# hn.bf0.65,
+# hr.bf0.65,
+# hn.bf0.65c,
+# hr.bf0.65c,
+# hn.bf0.65cb,
+# hr.bf0.65cb,
+# hn.sz0.65,
+# hr.sz0.65,
+# hn.szc0.65,
+# hr.szc0.65,
+# hn.szc0.65b,
+# hr.szc0.65b,
+# 
+# hn.sw0.65,
+#   hn.bf.sz0.65,
+#   hn.bf.sw0.65,
+#   hn.sz.sw0.65,
+#   hn.bf.sz.sw0.65,
+#   hr.sw0.65,
+#   hr.bf.sz0.65,
+#   hr.bf.sw0.65,
+#   hr.sz.sw0.65,
+#   hr.bf.sz.sw0.65,
+#   hn.bfc.sz0.65 ,
+#   hr.bfc.sz0.65 ,
+#   hn.bfcb.sz0.65,
+#   hr.bfcb.sz0.65,
+#   hn.bfc.sw0.65 ,
+#   hr.bfc.sw0.65 ,
+#   hn.bfcb.sw0.65,
+#   hr.bfcb.sw0.65,
+#   hn.bfc.sz.sw0.65,
+#   hr.bfc.sz.sw0.65,
+#   hn.bfcb.sz.sw0.65,
+#   hr.bfcb.sz.sw0.65,
+# hn.obs.v0.65,
+# hr.obs.v0.65    ,
+# hn.obs.bfc0.65  ,
+# hr.obs.bfc0.65  ,
+# hn.v.bfc0.65    ,
+# hr.v.bfc0.65    ,
+# hn.obs.v.bfc0.65,
+# hr.obs.v.bfc0.65,
+#                                    output="plain")
+# tab.ft0.65 <-  model.table.0.65km$`Key function`[which(nchar(model.table.0.65km$`Key function`) >11)]
+# 
+# model.table.0.65km %<>% mutate(`Key function` = case_when(
+#     nchar(`Key function`)>12 ~ paste0(substring(`Key function`, 1,11),"*"),
+#     nchar(`Key function`) <=12 ~ `Key function`))
+# # saveRDS(model_table_2km, "model_table_2km.rds")
+# 
+# kableExtra::kable(model.table.0.65km, digits=3, row.names = FALSE, escape=FALSE,
+#       caption = paste(sp, " - Comparison of half normal and hazard rate with sea state and group size. Truncation = 0.65 km.")) %>%
+#   kableExtra::footnote(paste0("* ", tab.ft0.65)) %>%
+#   kableExtra::landscape()
+
+
+```
+
+
+<!-- ```{r plot_best_models} -->
+<!-- par(mfrow=c(1,3)) -->
+<!-- plot_df(sp, hr.0.7,showpoints=F) -->
+<!-- plot_df(sp, hn.obs.bfc0.7,showpoints=F) -->
+<!-- plot_df(sp, hn.bf0.7c,showpoints=F) -->
+<!-- par(mfrow=c(1,3)) -->
+<!-- plot_df(sp, hn.bf0.8,showpoints=F) -->
+<!-- plot_df(sp, hn.szc.bfc0.8,showpoints=F) -->
+<!-- plot_df(sp, hn.bf0.8c,showpoints=F) -->
+<!-- par(mfrow=c(1,3)) -->
+<!-- gof_ds(hr.0.7, main="hr.0.7") -->
+<!-- gof_ds(hn.obs.bfc0.7, main="hn.obs.bfc0.7") -->
+<!-- gof_ds(hn.bf0.7c, main="hn.bf0.7c") -->
+<!-- par(mfrow=c(1,3)) -->
+<!-- gof_ds(hn.bf0.8, main="hn.bf0.8") -->
+<!-- gof_ds(hn.szc.bfc0.8, main="hn.szc.bfc0.8") -->
+<!-- gof_ds(hn.bf0.8c, main="hn.bf0.8c") -->
+
+<!-- ``` -->
+# Adjustment terms
+
+```{r try_different_adjustment_terms}
+# hn.cos2 <- ds(data=df, truncation=0.8, key="hn", adjustment="cos", order =2)
+# hn.cos3 <- ds(data=df, truncation=0.8, key="hn", adjustment="cos", order = 3)
+# 
+# 
+# hn.cos4 <- ds(data=df, truncation=0.8, key="hn", adjustment="cos", order = 4)
+# hn.herm2 <- ds(data=df, truncation=0.8, key="hn", adjustment="herm", order =2)
+# hn.herm3 <- ds(data=df, truncation=0.8, key="hn", adjustment="herm", order = 3)
+# # hn.herm4 <- ds(data=df, truncation=0.8, key="hn", adjustment="herm", order = 4)
+# hn.poly2 <- ds(data=df, truncation=0.8, key="hn", adjustment=  "poly", order = 2) # for poly, must input even orders
+# hn.poly4 <- ds(data=df, truncation=0.8, key="hn", adjustment= "poly", order = 4)
+# hn.poly6 <- ds(data=df, truncation=0.8, key="hn", adjustment="poly", order = 6)
+# 
+# model.table.0.8km.w.adj <- summarize_ds_models(hn.cos2, 
+#                                        hn.cos3, 
+#                                        hn.cos4,
+#                                        hn.herm2, 
+#                                        hn.herm3, 
+#                                        # hn.herm4,
+#                                        hn.poly2,
+#                                        hn.poly4,
+#                                        hn.poly6,
+#                                        output="plain") 
+# 
+# names(model.table.0.8km.w.adj)[c(5,6)] <- c("Avg det**", "se(Avg det)**")
+# # saveRDS(model.table.0.8km.w.adj, "model.table.0.8km.w.adj.rds")
+# 
+# kableExtra::kable(model.table.0.8km.w.adj, digits=3, row.names = FALSE, escape=FALSE,
+#       caption = "Comparison of half normal model w adjustments. Truncation = 0.8 km.") %>% 
+#   kableExtra::landscape() %>% 
+#   kableExtra::footnote("** Avg det = Average detectability")
+
+```
+
+
+
+
+<!-- **Calculating the Horvitz-Thompson estimate** -->
+
+```{r ht-estimate}
+# # total area of the region we want to estimate abundance for
+# # run this in create_transects.R in cemore_design:
+# # Full_study_area@region %>% st_as_sf() %>% st_area() %>% sum()/1000000 
+# # OR  sum(Full_study_area@area)/1000000
+# A <- 5039.467 #km^2
+# 
+# # total area we surveyed (2wL)
+# l <- round(sum(st_length(all_effort_lines))/1000) %>% as.numeric() # total length of surveyed transects in km
+# w <- 1 # truncation distance in km
+# a <- 2 * w * l
+# 
+# # # group sizes
+# # GroupSizes <- hr.bf1$ddf$data$GroupSize
+# # # need to get those that are within truncation!
+# # GroupSizes <- GroupSizes[hr.bf1$ddf$data$distance <= 1] # PAUSED HERE working from github>training>online dsm>practicals>01
+# # 
+# # # probabilities of detection
+# # probs <- predict(df_hr_beau)$fitted
+# # 
+# # # now the H-T estimator
+# # 
+# # Nhat_hr_beau <- (A/a) * sum(GroupSizes/probs)
+# # Nhat_hr_beau
+```

@@ -1,0 +1,190 @@
+---
+title: "Analysis"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, results = FALSE)
+```
+
+## Data exploration
+
+
+```{r }
+source("../R/0 Setup.R")# Set parameters
+# year = 2021
+# month = "08"
+# month_abb <- month.abb[as.numeric(month)]
+# survey_title <- paste(first_up(month_abb), year) 
+```
+
+```{r}
+folder = paste0("../survey_data/raw_data/",year,  "-",month)
+surveyid = paste0("cemore_", year, tolower(month_abb))
+```
+
+```{r load spatial files}
+# ----------------- LOAD SPATIAL FILES --------------------------------
+# bc coast for plotting
+if(!exists("coast")){
+coast <- sf::st_read(dsn = "../shapefiles", layer = "BC_coast_UTM9")
+}
+# higher resolution bc coast --- takes a long time to load
+# if(!exists("bc_shp")){
+#   bc_shp <- sf::st_read(dsn = "shapefiles", "BC_AK_WA_union_polygon") %>%
+#   sf::st_transform(crs = 4326)
+# }
+# Pacific Canada polygon for outlining Canadian border
+if(!exists("canada_shp")){
+canada_shp <- st_read(dsn = "../shapefiles", "CanadianEEZ") %>%
+  st_transform(crs = 4326)
+}
+d <- st_read("../shapefiles/less_than_5m.shp") %>% st_transform(crs = 4326)
+
+coord <- ggplot2::coord_sf(xlim = c(-125.5, -123), ylim = c(48.1, 49.5), crs = sf::st_crs(4326)) 
+
+# create bathymetric layer
+bathy <- getNOAA.bathy(-125.5, -122.5,48.1, 49.5,res=1) %>% 
+  fortify(bathy) 
+bathy$z[which(bathy$z >= 0)] <- 0
+col <- rev(RColorBrewer::brewer.pal(9L, "Blues")[4:7])
+col_ramp <- colorRampPalette(col)
+
+
+g <- ggplot() + 
+  geom_raster(aes(x=x,y=y,fill = z), data = bathy) +  labs(fill = "Depth (m)") +
+  scale_fill_gradientn(colours = col_ramp(20)) +
+  ggnewscale::new_scale("fill") +
+  # geom_contour(data = b, 
+  #              aes(x=X, y=Y, z=PID),
+  #              breaks=c(-250),
+  #              size=c(0.6),
+  #              colour="grey")+
+  geom_sf(data = coast, stroke = 0.05, fill = "light yellow", colour = "grey 60")+
+  geom_sf(data = canada_shp, colour = "red", fill = NA, linetype = "solid") 
+
+g + coord
+```
+
+# Plot planned transects
+```{r planned-transects}
+#-------------------------------------------------------------------------------
+# planned trackline - collate all created survey transect gpx files
+# ------------------------------------------------------------------------------
+transect_dir <- "../survey_data/survey transects/gpx"
+files <- list.files(transect_dir)
+t <- purrr::map_df(files, tidy_transects) 
+t %<>% mutate(month_year = factor(paste0(month_abb, " ", year),
+       levels = c("Sep 2020", "Oct 2020", "Nov 2020","Jan 2021", "Feb 2021",
+                                             "Mar 2021", "Apr 2021", "May 2021", "Jun 2021", "Jul 2021",
+                                             "Aug 2021")),
+       season = as.factor(dplyr::case_when(
+         month %in% c(7:9) ~ "Summer",
+         month %in% c(10:12)  ~ "Fall",
+         month %in% c(1:3) ~ "Winter",
+         month %in% c(4:6) ~ "Spring"
+       ))) # TO DO: add as needed"Jun", "Jul",, "Dec"
+
+# remove transect lines at depth less than 5 m and outside of Canadian waters
+transects <- t %>% st_difference(d) %>% 
+  st_intersection(canada_shp) %>% 
+  arrange(iteration) 
+
+g +
+  geom_sf(data = transects, colour = "black") +
+  # geom_sf(data = transects, aes(colour = month_year)) +
+  ggtitle("All planned transect lines") +
+  coord 
+  # facet_wrap( ~ season, drop = F)
+```
+# Import effort data
+```{r import-effort-data}
+# Import all effort data
+all_effort <- load_effort(year, month, single_survey = F)
+all_effort_lines <- get_effort_lines(all_effort)
+g +
+  geom_sf(data = all_effort_lines) +
+  coord + 
+  ggtitle(paste0("All surveyed transects to ", month_abb, " ", year))
+
+cols <- c("brown", "green", "orange", "blue")
+g + 
+  geom_sf(data = transects, aes(colour = season), size = 0.1) +      # PLANNED
+  # geom_sf(data = all_effort_lines, colour = "black", size = 1) +   # ON-EFFORT  # ON-EFFORT
+  scale_colour_manual(values = cols) +
+  geom_sf(data = all_effort_lines, colour = "black", size = 0.5)  +  # ON-EFFORT
+  guides(colour=guide_legend(title="Season")) +
+  coord +
+  ggtitle(paste0("Cemore survey transect coverage"),
+          paste0("Sep 2020 - ", first_up(month), " ", year))
+```
+
+# Compare planned vs. completed transect lines
+```{r completed-lines}
+
+
+```
+
+#Import sightings data - show example Humpback data
+```{r import-sightings-data}
+# Import all sightings data
+# ---------------------------------------------------------------
+all_ap_sf <- readRDS(paste0("../output/all_effort_sgt_to ", survey_title, ".rds"))
+pal <- RColorBrewer::brewer.pal(12, "Paired")[c(2:10, 12)]
+s <- all_ap_sf %>%
+  filter(!is.na(PSD_nm))
+sp <- "Humpback"
+# to get y value for height of plot text
+y <- ggplot(data = s) + geom_histogram(aes(PSD_nm))# + facet_grid(season ~ Species)
+y <- ggplot_build(y)
+y <- y$data[[1]]$y %>% max()
+
+# # to create text for facet grid (for non-facetted plot, group by 'Event') to get only one line for plot text
+# # to facet by second variable, add desired variable to 'group_by' here
+tx <- s %>%
+  # group_by(Event) %>%
+  group_by(season) %>%
+  summarise(N = n(),
+            max_dist = paste0(round(max(PSD_nm),2), " nm"),
+            med_dist = paste0(round(median(PSD_nm),2), " nm"),
+            mean_dist = paste0(round(mean(PSD_nm),2), " nm"))
+
+col <- (RColorBrewer::brewer.pal(9L, "Blues")[4:7])
+col_ramp <- colorRampPalette(col)
+
+ggplot() +
+  geom_histogram(data = s, aes(PSD_nm, fill = as.character(beauf))) +
+  scale_fill_manual(name ="",values= col_ramp(5)) +
+  ggtitle(paste0("Distances to ", sp, " observations"), subtitle = survey_title) +
+  xlab("Distance (nm)") +
+  ylab("Count") +
+  geom_text(data = tx, aes(x = (0.75 * max(s$PSD_nm)), y = y, label = paste0("N = ", N))) +
+  geom_text(data = tx, aes(x = (0.75 * max(s$PSD_nm)), y = 0.80 * y, label = paste0("Max distance = ", max_dist))) +
+  geom_text(data = tx, aes(x = (0.75 * max(s$PSD_nm)), y = 0.60 * y, label = paste0("Median distance = ", med_dist))) +
+  geom_text(data = tx, aes(x = (0.75 * max(s$PSD_nm)), y = 0.40 * y, label = paste0("Mean distance = ", mean_dist))) +
+  facet_grid(season ~.)
+
+```
+
+```{r, echo=TRUE, eval=answer}
+summary(s$PSD_nm)
+# s %>% group_by(Species) %>% split() %>% map(summary)
+```
+
+ to plot the histogram of distances, the command is:
+
+```{r, echo=TRUE, eval=answer, fig.margin=TRUE, fig.width=3.5, fig.height=3.5}
+hist(s$PSD_nm, xlab="Distance (m)")
+```
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

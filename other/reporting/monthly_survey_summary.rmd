@@ -1,0 +1,365 @@
+---
+title: "CeMoRe Survey Summary"
+author: ""
+date: ""
+output: 
+  word_document: 
+    fig_caption: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      collapse = TRUE,
+                      warning = FALSE,
+                      message = FALSE)
+knitr::opts_chunk$set(fig.width=18)
+
+source("../R/0 Setup.R")
+
+knitr::knit_hooks$set(inline=
+                        function(x){
+                          if(!is.numeric(x)){x
+                          }else{prettyNum(round(x,2),
+                                         big.mark=",")}})
+knitr::knit_hooks$set(inline=
+                        function(x){
+                          if(!is.numeric(x)){x
+                          }else{ifelse(x<10,as.character(english::as.english(x)),x)}})
+
+```
+
+```{r load_data, include = F}
+effort <- load_effort(year, month, single=T)
+effort_lines <- get_effort_lines(effort)
+ap_sf <- load_sightings(year, month, single=T)
+
+# all_effort <- load_effort(year, month, single=F, vessel = "MB")
+# all_effort_lines <- readRDS(paste0("../output/all_lines/all_effort_lines_to_", year,"_", month, ".rds")) %>%
+#   mutate(length_km = as.numeric(st_length(geometry))/1000)
+# all_ap_sf <- readRDS(paste0("../output/all_sgt/all_effort_sgt_to_", year,"_",month, ".rds"))
+
+
+summary <- survey_summary()
+s <- summary[[1]]
+sp <- summary[[2]]
+dates <- summary[[4]]
+# summary_all <- survey_summary(single=F)
+
+survey <- paste(month.name[dates[1,]$start_month], year)
+firstday <- dates$firstday
+lastday <- dates$lastday
+```
+# `r survey`
+This report provides a summary of the Cetacean Research Program’s field efforts to meet commitments under TMX Recommendations 5/6 `r firstday` to `r lastday`, `r year`.
+
+## Field program overview
+In order to meet DFO’s commitments under TMX Recommendations 5 and 6, the Cetacean Research Program has assembled a dedicated team for Cetacean Monitoring and Research (CeMoRe) in the southern Salish Sea. Fieldwork is focused on better understanding the abundance, distribution, and behaviour of cetaceans in the TMX project area. Field objectives include line-transect surveys, deployment of acoustic recorders, deployment of data-logging tags on humpback whales, and collection of genetic and photo-identification data from humpback whales. 
+
+Line-transect surveys are being conducted monthly (weather permitting) in the TMX project area from Vancouver to Swiftsure Bank (since July 2020). These surveys are required to describe the seasonal distribution and estimate the abundance of cetaceans, and to address identified data gaps with respect to vessel strike risk for these species.
+
+Acoustic recorders are being deployed to record the high-frequency clicks produced by porpoises. The acoustic data supplements boat-based surveys by providing insight into habitat use of porpoises that cannot be gained from visual surveys (i.e. how use of various water depths and habitat types may vary between day and night) and implications for vessel-related impacts on these species. Acoustic recorders are deployed systematically throughout the project area and data are downloaded from each recorder at least once every three months. 
+
+Collaborative humpback whale tagging efforts are being conducted with researchers from Cascadia Research Collective (CRC) and Stanford University. Data from these tags provide insight into humpback whale dive behaviour in and around shipping lanes and how this behaviour influences their vulnerability to vessel strikes, including during nighttime hours and weather conditions in which visual surveys are not possible. 
+
+Photo-identification and genetic data from humpback whales are being collected to inform population structure and movements of humpback whales in Canadian Pacific waters, and therefore the proportion of the North Pacific humpback whale population that is impacted by vessel strike risk in the project area. 
+
+*The CeMoRe team’s next field effort is planned for January 11-25, 2022, aboard the CCG vessel Tanu on the Central Coast including a line-transect survey and photo-identification and genetic sampling of humpback whales.*
+\newpage
+
+<!-- During the recent field effort, the team was able to deploy tags on whales in the inside waters of Juan de Fuca, as well as in the more open waters on and around Swiftsure Bank (Figure 3). Data collected from these tags can therefore contribute to regional comparison of humpback whale movements and dive behaviour within the overall project area.   -->
+### `r survey` field work summary
+Field work focused on `r surveys[which(surveys$year == year & surveys$month_abb == month_abb),]$objectives %>% tolower()`. The survey included `r length(unique(effort$TransectID))` transects (`r round(sum(st_length(effort_lines))/1000,0) %>% units::set_units(NULL)` km) over `r length(unique(day(effort$GpsT)))` days of `r dates$field_days` total field days (Figure 1, Table 1). 
+<!-- *fix this messy sentence* The completed transect lines resulted in `r nrow(ap_sf)` sightings of `r sum(ap_sf$Group_Size)` individual cetaceans (Table 1, Figure 1). This was comprised of `r ap_sf %>% filter(Species %like% "hump") %>% nrow()` sightings of humpback whales (`r sum(ap_sf[which(ap_sf$Species %like% "hump"),]$Group_Size)` individuals), `r ap_sf %>% filter(Species %like% "harbour") %>% nrow()` sightings of harbour porpoise (`r sum(ap_sf[which(ap_sf$Species %like% "harbour"),]$Group_Size)` individuals), `r ap_sf %>% filter(Species %like% "Dall") %>% nrow()` sightings of Dall’s porpoise (`r sum(ap_sf[which(ap_sf$Species %like% "Dall"),]$Group_Size)` individuals), and `r ap_sf %>% filter(Species %like% "kill") %>% nrow()` sighting of killer whales of unknown ecotype (`r sum(ap_sf[which(ap_sf$Species %like% "kill"),]$Group_Size)` individuals).  -->
+
+```{r sgt-tbl} 
+sgt_tbl <- sp %>% as.data.frame() %>%  dplyr::select(-SurveyID) %>% rename("Number of sightings" = number_sightings, "Total number of individuals" = number_individuals)
+
+sgt_tbl_cp <- "Table 1: Species sightings for the CeMoRe July 2022 survey."
+
+csasdown::csas_table(sgt_tbl,longtable = F,  escape = FALSE, font_size=9,  align=c("l","r","r"), caption =sgt_tbl_cp)
+```
+
+```{r prep-plot,results='hide'}
+survey_map_file <- paste0("C:/Users/keppele/Documents/CeMoRe/Analysis/cemore_analysis/output_maps/summary_map_", survey_title, ".png")
+
+if(!file.exists(survey_map_file)){
+  p <- plot_survey(single_survey=T,Save=T, incidentals=F, hydrophone=F)
+  knitr::plot_crop(survey_map_file)
+}
+```
+
+```{r survey-plot, fig.cap=paste("\\label{fig:plot}Figure 1. Cetacean line-transect survey effort", firstday, "to", lastday, year, "including all on-effort and incidental sightings.")}
+#  Acoustic recorder deployment locations are shown as asterisks.
+knitr::include_graphics(paste0("C:/Users/keppele/Documents/CeMoRe/Analysis/cemore_analysis/output_maps/summary_map_",survey_title,".png"))
+```
+<!-- In addition to the survey, one acoustic recorder was deployed in eastern Juan de Fuca Strait near Whirl Bay, and two previously deployed recorders were recovered. -->
+
+\newpage
+
+<!-- ### All surveys summary -->
+<!-- To date, the total distance surveyed from the primary research vessel, the R/V Manyberries, has been `r round(sum(st_length(all_effort_lines))/1000) %>% as.numeric()` km (`r length(unique(all_effort$SurveyID))` surveys from August/September 2020 to `r survey`). -->
+
+
+<!-- ```{r prep-lines-plot,results='hide'} -->
+<!-- all_surveys_map_file <- paste0("C:/Users/keppele/Documents/CeMoRe/Analysis/cemore_analysis/output_maps/effortlines_", survey_title, "_high_res.png") -->
+
+
+<!-- if(!file.exists(all_surveys_map_file)){ -->
+<!--   p <- plot_survey(Save = T, -->
+<!--                         border = F, -->
+<!--                         single_survey=F, -->
+<!--                         plot_effort=T, -->
+<!--                         season=T, -->
+<!--                         species=NULL, -->
+<!--                         incidentals=F, -->
+<!--                         hydrophone=F, -->
+<!--                         plot_sgt=F, -->
+<!--                         N=T, -->
+<!--                         km=T, -->
+<!--                         depth=F, -->
+<!--                         coord=NULL, -->
+<!--                         bathy=NULL, -->
+<!--                    file_name=file.path("../output/test.png")) -->
+<!--   ggsave(all_surveys_map_file) -->
+<!--   knitr::plot_crop(all_surveys_map_file) -->
+<!-- } -->
+<!-- # all_surveys_plot_cap <- paste("\\label{fig:plot}Figure 1. Cetacean line-transect survey effort", firstday, "to", lastday, year, "including all on-effort sightings. Acoustic recorder deployment locations are shown as asterisks.") -->
+<!-- ``` -->
+
+<!-- ```{r lines-plot,fig.cap=paste0("\\label{fig:plot}Figure 1. Cetacean line-transect survey effort Aug/Sep 2020 to ", month_abb, " ",year,".")} -->
+<!-- knitr::include_graphics(all_surveys_map_file) -->
+<!-- ``` -->
+
+<!-- ```{r sum-data, include=F} -->
+<!-- # source(file.path(cemore, "developing/summary.R")) -->
+<!-- t1 <- summary_all[[1]] -->
+<!-- t2 <- summary_all[[4]] -->
+<!-- t3 <- summary_all[[3]] -->
+<!-- t3[which(t3$SurveyID=="cemore_2020sep"),]$transects <- 28 -->
+<!-- t3[which(t3$SurveyID=="cemore_2020sep"),]$on_effort_days <- 4 -->
+
+<!-- t4 <- merge(t1,t3) %>% merge(t2[,c("SurveyID","field_days")]) %>% left_join(surveys) -->
+<!-- # t4$SurveyID <- factor(t4$SurveyID, levels = levels(t1$SurveyID)) -->
+<!-- # t4$field_days <- t4$field_days %>% as.numeric() -->
+<!-- t4$field_days[which(t4$year==2020 & t4$month_abb =="Sep")] <- 13 -->
+
+<!-- # t4$month_abb[which(t4$year==2022 & t4$month_abb =="Apr")] <- "Apr-May" -->
+<!-- jul2020 <- c(NA,14,21,NA,NA,NA,3,2020,"Jul",99,"Testing survey protocols; staff familiarization with research methods, protocols, and equipment") -->
+<!-- aug2020 <- c(NA,14,19,1,6,"rolled into Sep 2020 survey",2,2020,"Aug",99,"Staff familiarization with research equipment and research vessel; first line-transect survey from primary vessel") -->
+<!-- names(jul2020) <- names(t4) -->
+<!-- names(aug2020) <- names(t4) -->
+<!-- t4 <- rbind(t4,jul2020) %>% rbind(aug2020) %>% dplyr::arrange(year,month_abb) -->
+<!-- ``` -->
+
+<!-- \newpage -->
+
+<!-- ```{r summary} -->
+<!-- t5 <- t4 %>% dplyr::select(Year = year, Month=month_abb, "Primary objective(s) of field activities"=objectives,"Field days"=field_days,"Survey days"=on_effort_days,"Transects"=transects,"Distance surveyed (km)" = distance_km)#, "Cetacean sightings"=number_sightings,"Individual cetaceans sighted"=number_individuals)  -->
+
+<!--   csasdown::csas_table(t5,longtable = F,  escape = FALSE, font_size=9,  caption ="Table 1: The CeMoRe Team’s monthly field efforts since July 9, 2020.  *Aug 2020 survey effort rolled into Sep 2020 survey.*")# -->
+<!--   # The number of cetacean individuals and groups listed below represent preliminary data; considerations such as effort and weather conditions have not yet been accounted for.%>%  -->
+<!--  # kableExtra::column_spec(c(1:6), width = c("1cm","1cm","1cm","8cm","1cm","1cm")) -->
+
+<!-- ``` -->
+
+
+
+<!-- \newpage -->
+
+<!-- ```{r prep-all-surveys,results='hide'} -->
+<!-- # all_survey_map_file <- paste0("../output_maps/summary_map_", survey_title, ".png") -->
+<!-- #  -->
+<!-- # if(!file.exists(survey_map_file)){ -->
+<!-- #   p <- plot_survey(single_survey=F,season=T,Save=F) -->
+<!-- #   knitr::plot_crop(survey_map_file) -->
+<!-- # } -->
+<!-- # survey_plot_cap <- paste("\\label{fig:plot}Figure 1. Cetacean line-transect survey effort", firstday, "to", lastday, year, "including all on-effort sightings, and incidental sightings of i) Bigg's killer whales and ii) the southern-most sighting of killer whales of unknown ecotype. Acoustic recorder deployment locations are shown as asterisks.") -->
+<!-- species <- all_ap_sf$Species %>% unique() -->
+<!-- target_sp <- c("humpback whale","harbour porpoise","Dall's porpoise") -->
+<!-- kw <- species[species %like% "killer"] %>% factor(levels = species[species %like% "killer"]) -->
+<!-- other_sp <- species[!species %in% target_sp & !species %like% "killer"] -->
+
+<!-- for(i in target_sp){ -->
+<!--   all_surveys_map_file <- paste0("../output_maps/all_surveys_summary_map_to_", survey_title,"_",i, ".png") -->
+
+<!--   p <- plot_survey(single_survey=F,season=T,Save=F,species=i)  + -->
+<!--     theme(plot.margin = unit(c(0,-1,0,-0.5,0), "cm")) #top, right, bottom, left -->
+<!--   ggsave(all_surveys_map_file,plot=p,width=18,units="cm") -->
+<!--   knitr::plot_crop(all_surveys_map_file) -->
+<!-- } -->
+
+
+<!-- all_surveys_map_file <- paste0("../output_maps/all_surveys_summary_map_to_", survey_title,"_other_sp", ".png") -->
+<!-- p <- plot_survey(single_survey=F,season=T,Save=F,species=other_sp)  + -->
+<!--   theme(plot.margin = unit(c(0,-1,0,-0.5,0), "cm")) -->
+<!--   ggsave(all_surveys_map_file,plot=p) -->
+<!-- knitr::plot_crop(all_surveys_map_file) -->
+
+<!-- all_surveys_map_file <- paste0("../output_maps/all_surveys_summary_map_to_", survey_title,"_kw", ".png") -->
+<!-- p <- plot_survey(single_survey=F,season=T,Save=F,species=kw)  + -->
+<!--   theme(plot.margin = unit(c(0,-1,0,-0.5,0), "cm")) -->
+<!-- ggsave(all_surveys_map_file,plot=p) -->
+<!-- knitr::plot_crop(all_surveys_map_file) -->
+
+<!-- # incid <- get_incid() -->
+<!-- all_incid <- get_incid(single_survey=F) %>%  -->
+<!--   mutate(season = factor(dplyr::case_when( -->
+<!--                               month %in% c(1:3) ~ "Winter", -->
+<!--                               month %in% c(4:6) ~ "Spring", -->
+<!--                               month %in% c(7:9) ~ "Summer", -->
+<!--                               month %in% c(10:12)  ~ "Fall" -->
+<!--                             ), levels = c("Winter", "Spring", "Summer", "Fall"))) -->
+<!-- incid <- all_incid$Species %>% unique() -->
+<!-- incid <- incid[!incid %in% target_sp & !incid %like% "killer"] -->
+
+<!-- all_surveys_map_file <- paste0("../output_maps/all_surveys_summary_map_to_", survey_title,"_incid", ".png") -->
+<!-- p <- plot_survey(single_survey=F,season=T,Save=F,incidentals=T,species=incid) + -->
+<!--   theme(plot.margin = unit(c(0,-1,0,-0.5,0), "cm")) -->
+<!-- ggsave(all_surveys_map_file,plot=p) -->
+<!-- knitr::plot_crop(all_surveys_map_file) -->
+
+<!-- # fig_axis_size <- 11 -->
+<!-- # fig_legend_size <- 11 -->
+<!-- # base_map <- ggplot() + -->
+<!-- #   geom_raster(aes(x=x,y=y,fill = z), data = bathy) +  #labs(fill = "Depth (m)") + -->
+<!-- #   scale_fill_gradientn(colours = col_ramp(20), guide = "none") + -->
+<!-- #   ggnewscale::new_scale("fill") + -->
+<!-- #   geom_sf(data = coast_file, stroke = 0.05, fill = "light yellow", colour = "grey 60") + -->
+<!-- #   guides(alpha= "none") + -->
+<!-- #   ylab("")+xlab("") -->
+<!-- # plot_sp_monthly <- function(species=NULL, -->
+<!-- #                             sightings_data=all_ap_sf, -->
+<!-- #                             effort_data=all_effort_lines){ -->
+<!-- #   ap_sf <- sightings_data #%>% filter(Species %like% species) -->
+<!-- #   ap_sf$Species %<>% droplevels() -->
+<!-- #   # to order legend symbols consistently -->
+<!-- #   sp <- unique(c(levels(ap_sf$Species))) -->
+<!-- #  -->
+<!-- #   # create text dataframe for labels -->
+<!-- #   tx <- effort_data %>% -->
+<!-- #     as.data.frame() %>% -->
+<!-- #     dplyr::group_by(month_abb) %>% -->
+<!-- #     dplyr::summarise(dist = round(sum(length_km),0), -->
+<!-- #                      lab=list(unique(year))) %>% -->
+<!-- #     mutate(lab=Map( -->
+<!-- #       function(x,y) paste(x, paste(y,collapse=", "),sep = " "), -->
+<!-- #       month_abb,lab) %>% -->
+<!-- #         unlist()) %>% -->
+<!-- #     arrange(month_abb) %>% -->
+<!-- #     mutate(lab= factor(lab,levels=c(unique(.$lab),"Dec - 0 years")))%>% -->
+<!-- #     as.data.frame() -->
+<!-- #   tx[nrow(tx) + 1,] <- c("Dec",0, "Dec - 0 years") -->
+<!-- #  -->
+<!-- #   # add labels to spatial data frames for facetting -->
+<!-- #   effort_lines <- sp::merge(effort_data, tx, by="month_abb") -->
+<!-- #   ap_sf <- sp::merge(ap_sf, tx, by="month_abb") -->
+<!-- #    -->
+<!-- # b <- RColorBrewer::brewer.pal (11,"RdYlBu")[11] -->
+<!-- # g <- RColorBrewer::brewer.pal (11,"PRGn")[10] -->
+<!-- # y <- RColorBrewer::brewer.pal (9,"YlOrBr")[5] -->
+<!-- # br <- RColorBrewer::brewer.pal (9,"RdGy")[1] -->
+<!-- # seasons <- c(b,g,y,br) -->
+<!-- #    -->
+<!-- #   p <- base_map + -->
+<!-- #     geom_sf(data = effort_lines, stroke = 0.25,colour="grey50")+ -->
+<!-- #     geom_sf(data = ap_sf, stroke = 0.01, aes(colour=season, size = Clumped_Group_Size)) +# -->
+<!-- #     scale_colour_manual(values=seasons)+ -->
+<!-- #     scale_size_manual(values = c(1.5,2,2.5,3), name = "Number of Individuals") + -->
+<!-- #     coord + -->
+<!-- #       guides(colour= "none") + -->
+<!-- #     # ggtitle(paste0("Monthly ", sp, " sightings")) + -->
+<!-- #     theme(legend.position = "bottom", -->
+<!-- #           legend.key = element_blank(), -->
+<!-- #           # legend.margin = margin(0), -->
+<!-- #           # legend.key.size = unit(0.1,"cm"), -->
+<!-- #           legend.text = element_text(size=fig_legend_size), -->
+<!-- #           axis.text=element_text(size=fig_axis_size), -->
+<!-- #           axis.text.x=element_text(angle=90), -->
+<!-- #           plot.margin = unit(c(0,0,0,0), "cm"), -->
+<!-- #   panel.background = element_blank(), -->
+<!-- #   panel.border = element_blank())+ -->
+<!-- #     scale_x_continuous(breaks = seq(from = -123, to = -125.5, by = -1)) + -->
+<!-- #     scale_y_continuous(breaks = seq(from = 48.2, to = 49.4, by = 0.4), limits = c(48.0,49.5)) + -->
+<!-- #     geom_text(data = tx, aes(x = -124.3, y = 48.8, label = paste0(dist, " km")), size = 3) + -->
+<!-- #  -->
+<!-- #     facet_wrap(~lab, drop = F, ncol=3) -->
+<!-- #    -->
+<!-- #     # ggdraw(p) + -->
+<!-- #     # draw_label("Winter", x = 0, y = 0.87, hjust = 0, vjust = 0,size=10, angle=90)+ -->
+<!-- #     # draw_label("Spring", x = 0, y = 0.65, hjust = 0, vjust = 0,size=10, angle=90)+ -->
+<!-- #     # draw_label("Summer", x = 0, y = 0.45, hjust = 0, vjust = 0,size=10, angle=90)+ -->
+<!-- #     # draw_label("Fall", x   = 0, y = 0.24, hjust = 0, vjust = 0,size=10, angle=90) -->
+<!-- #  -->
+<!-- #   ggsave(paste0("knitr-figs-pdf/",sp,"_monthly_stg_map.png"),plot=p) -->
+<!-- #   plot_crop(paste0("knitr-figs-pdf/",sp,"_monthly_stg_map.png")) -->
+<!-- #   knitr::include_graphics(paste0("knitr-figs-pdf/",sp,"_monthly_stg_map.png")) -->
+<!-- # } -->
+<!-- ``` -->
+
+<!-- ```{r plot-hw, results='hide'} -->
+<!-- plot_survey(single_survey=F,season=T,Save=F,species=kw) %>%  -->
+<!--     theme(plot.margin = unit(c(0,-1,0,-0.5,0), "cm")) -->
+
+<!-- # species <- all_ap_sf$Species %>% unique() -->
+<!-- # target_sp <- c("humpback whale","harbour porpoise","Dall's porpoise") -->
+<!-- # kw <- species[species %like% "killer"] %>% factor(levels = species[species %like% "killer"]) -->
+<!-- # other_sp <- species[!species %in% target_sp & !species %like% "killer"] -->
+<!-- #   -->
+<!--   all_surveys_map_file <- paste0("../output_maps/all_surveys_summary_map_to_", survey_title,"_",target_sp[1], ".png") -->
+<!--  knitr::include_graphics(all_surveys_map_file) -->
+<!-- ``` -->
+
+<!-- \newpage -->
+
+<!-- ```{r plot-hp, results='hide'} -->
+<!--  all_surveys_map_file <- paste0("../output_maps/all_surveys_summary_map_to_", survey_title,"_",target_sp[2], ".png") -->
+<!--  knitr::include_graphics(all_surveys_map_file) -->
+<!-- ``` -->
+
+<!-- \newpage -->
+
+<!-- ```{r plot-dp, results='hide'} -->
+<!--   all_surveys_map_file <- paste0("../output_maps/all_surveys_summary_map_to_", survey_title,"_",target_sp[3], ".png") -->
+<!--  knitr::include_graphics(all_surveys_map_file) -->
+<!-- ``` -->
+
+<!-- \newpage -->
+
+<!-- ```{r plot-kw, results='hide'} -->
+
+<!--  all_surveys_map_file <- paste0("../output_maps/all_surveys_summary_map_to_", survey_title,"_kw", ".png") -->
+<!--  knitr::include_graphics(all_surveys_map_file) -->
+<!-- ``` -->
+
+<!-- \newpage -->
+
+<!-- Other species sighted while surveying ("on effort") -->
+<!-- ```{r plot-other, results='hide'} -->
+<!--   all_surveys_map_file <- paste0("../output_maps/all_surveys_summary_map_to_", survey_title,"_other_sp", ".png") -->
+<!--  knitr::include_graphics(all_surveys_map_file) -->
+<!-- ``` -->
+
+<!-- \newpage -->
+
+<!-- Other species sighted while not surveying ("on effort") -->
+<!-- ```{r plot-incid, results='hide'} -->
+<!--   all_surveys_map_file <- paste0("../output_maps/all_surveys_summary_map_to_", survey_title,"_incid", ".png") -->
+<!--  knitr::include_graphics(all_surveys_map_file) -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- # plot_sp_monthly() -->
+
+<!-- #   par(mar=c(0,0,0,0)) -->
+<!-- #  -->
+<!-- # p <- suppressMessages(plot_survey(single_survey = F,season=T)) -->
+<!-- # suppressMessages(ggsave("all_sgt_fig.png",p)) -->
+<!-- # knitr::plot_crop("all_sgt_fig.png", quiet=T) -->
+
+<!-- # # plot_survey(single_survey=F,season=T) -->
+<!-- # ``` -->
+<!-- #  -->
+<!-- #  -->
+<!-- #  -->
+<!-- # knitr::include_graphics("all_sgt_fig.png") -->
+<!-- ``` -->

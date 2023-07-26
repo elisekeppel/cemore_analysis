@@ -1,0 +1,26 @@
+---
+title: "Notes"
+author: "Elise Keppel"
+date: "11/10/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## TO DO
+
+Compare dist hist plots from MB and RB
+```{r hist-distance-survey, fig.cap="", fig.width=10}
+par(mfrow=c(1,2))
+# hw_sf <- all_ap_sf %>% filter(Species == "Humpback")
+hist(subset(all_ap_sf, vessel=="MB")$distance,
+     main="", bins = 50,
+     xlab="Distance (m)")
+
+hist(subset(all_ap_sf, vessel=="RB")$distance,
+     main="", bins = 50,
+     xlab="Distance (m)")
+```
+

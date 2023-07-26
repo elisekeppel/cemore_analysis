@@ -1,0 +1,41 @@
+Covariates
+
+Ideas:
+Depth
+Sea surface temperature - NOAA
+Chl a 
+Zooplankton- Rhian Evans DFO/IOS krill, 2021 paper
+sea surface height? Chad
+
+r packages for data extraction from internet redapextracto
+
+chs nonna 10 m dem
+
+Current speed
+Current direction
+Day of year
+Season
+Month
+Slope
+Bottom type (substrate)
+easting (X) and northing (Y)
+Proximity to land
+Proximity to other boats
+Transients in area
+
+PRISMM covariates:
+  Explanatory environmental covariates were measured at the midpoints of each of the segments. Explanatory covariates tested in models of all three strata included 
+
+easting (X) and
+northing (Y) (typically modelled as a bivariate smoother),
+water depth, 
+slope, 
+terrain ruggedness index (TRI), and 
+Euclidean distance to nearest shore.
+
+The covariates of distance to the 200 and 1,000 m bathymetric contours (i.e., the continental shelf edge and continental slope) were only included in models for the offshore stratum, while root mean square (RMS) of tidal current speed and distance to nearest area of high tidal current speed (m) were only relevant to the inshore strata (north coast and Salish Sea). Tidal current speed covariates were not included in any of the offshore models because tidal influence on currents diminishes with distance from the coast. 
+Water depths were extracted from a digital elevation model (DEM) raster with a resolution of 75 x 75 m. Both slope and TRI were calculated from the DEM using the “terrain” function in the R package “raster” (Hijmans 2019). TRI is the mean of the absolute differences between the depth value of a raster cell and the value of the eight surrounding cells. Slope and the related 
+4 
+covariate of TRI were chosen as potentially significant predictors of cetacean abundance, as these parameters are both ways of identifying regions with increased bathymetric complexity. Cetaceans and other marine predators are often found in areas with steeper topographical relief or high benthic rugosity because these features are associated with higher primary productivity or prey aggregations (Bouchet et al. 2015, Croll et al. 1998, Yen et al. 2004). 
+Similarly, we also selected the 200 and 1,000 m contours as potentially important bathymetric features because they correspond to the continental shelf break and continental slope, a steep area in which the relatively shallow waters of the continental shelf give way to much deeper water over the abyssal plain. The edge of the shelf is often characterized by upwelling and tidal mixing that result in increased primary productivity and concentrations of planktonic prey (Croll et al. 1998, Springer et al. 1996) and, thus, has been found to be a significant predictor of baleen whale presence in previous studies (Dalla Rosa et al. 2012, Harvey et al. 2017, Nichol et al. 2017, Yen et al. 2004). Euclidean distances to the 200 or 1,000 m isobaths were calculated in one of three possible ways: directional (distances were negative if the segment midpoint was east of the bathymetric contour (i.e., on the continental shelf) and positive if west of the contour), absolute (distances were positive regardless of the relative direction of the segment midpoint to the contour), and zero-positive (on-shelf segment midpoints were given a value of zero, whereas those west of the contour were given positive distance values). Since the continental shelf break runs roughly north to south in the Canadian Pacific, it was also possible to combine distances to the 200 m or 1,000 m bathymetric contour (covariates that typically had east-west gradients) in a bivariate smoother with northing (Y) in some models. 
+RMS tidal current speed and areas of high tidal speed modelled by Foreman et al. (2000) were obtained as spatial layers from the British Columbia Marine Conservation Atlas. Distances to high tidal current areas were calculated as the Euclidian distances from segment midpoints to the edge of the closest spatial polygon representing a high current area. These two measures of tidal current speed were included as covariates for the inshore strata, since tidal currents can act to aggregate the zooplankton prey of baleen whales in coastal regions (Rogachev et al. 2008). Tidal currents have also been shown to predict relative distributions and densities of harbour porpoises (Embling et al. 2010, Johnston et al. 2005). All covariates were calculated in SI units (i.e., metres for distances/depths, m s-1 for tidal current speed, and northing/easting in metres for position data) and were standardized prior to model fitting. All maps are displayed using the Albers Equal Area Conic projection.

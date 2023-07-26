@@ -55,41 +55,20 @@
 
 nul
 
-barplot_sgt_effort.R
-hp.R
-dp.R
-kw.R
-hw.R
-hp_df_new.Rmd
-explore_hp.R
-
 output_cemore
 output_maps_cemore
-lisa
-covariates
 summary_cemore
-grids
-notes
 OUTPUT FILES cemore
-summaries
-reporting
-other scripts
+
 output_mmcp
 output_maps_mmcp
 OUTPUT FILES mmcp
+summary_mmcp
+
 mmcp_data
-data_requests
-segments
 acoustic_data
-hydrophone
-simple_dsms
+summaries
 
-
-
-R/data_requests
-R/development_scripts
-R/porpoises
-R/rasters
 R/other
 R/0.5_Load_data.R
 R/1.5_Data_re-processing.R

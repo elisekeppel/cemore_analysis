@@ -1,0 +1,1250 @@
+---
+title: "Dall's porpoise abundance comparison between Feb 2022 data and Oct 2022 data"
+author: "EK"
+date: "3/1/2023"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = F)
+
+source("../R/0 Setup.R")
+{ year <- 2022
+  month <- "10"
+  iteration <- "24"
+  month_abb <- month.abb[as.numeric(month)]
+  survey_title <- paste(first_up(month_abb), year)
+  surveyid = paste0("cemore_", year, tolower(month_abb))
+  # rds <- file.path(dir, "survey_data/surveys.rds")
+}
+date <- Sys.Date()
+```
+
+Date last run: `r date`
+
+```{r load-data}
+#-----------------------------------------
+#-----------------------------------------
+# Load previously saved data
+#-----------------------------------------
+#-----------------------------------------
+# Effort data
+all_effort_lines <- readRDS(paste0("../output_",data.source,"/all_lines/all_effort_lines_to_", year, "_",month, ".rds")) 
+# ggplot()+geom_sf(data=all_effort_lines)
+l <- sum(st_length(all_effort_lines)) %>% as.numeric()/1000
+w = 0.8
+a <- l * w * 2
+
+# Sightings data
+sp = "Dall's Porpoise"
+all_ap_sf <- readRDS(paste0("../output_",data.source,"/all_sgt/all_effort_sgt_to_", year, "_", month, ".rds")) #%>% filter(date<date("2022-03-01") )
+
+# ---Areas from cemore_design.Rproj@create_monthly_survey_design---
+# sum(Full_study_area@area) 
+# A <- 5039.467 # km^2 (total survey area - should this be Cdn only?)
+# units(A) <- units::as_units("km^2")
+# ------- OR --------
+# study_area_can <- st_intersection(Full_study_area@region, canada_sdp)
+# st_area(study_area_can) %>% sum()
+B <- 2937.946 # %>% units::set_units(km^2)#km ^2
+
+#-----------------------------------------
+#-----------------------------------------
+#  SET UP DATA FRAMES
+#-----------------------------------------
+#-----------------------------------------
+
+#-----------------------------------------
+# Effort data = sample.table
+#-----------------------------------------
+# ntransects <- length(unique(all_effort_lines$TransectID))
+# t <- data.frame(TransectID=unique(all_effort_lines$TransectID), n=1:ntransects)
+effort <- all_effort_lines %>% 
+  data.frame() %>% 
+  # full_join(t) %>% 
+  # unique segment ID's and length for each
+  # note that when segmenting is complete, sample.label will be segment id
+  transmute(Sample.Label=TransectID,
+            # Region.Label = SurveyID,
+            Region.Label = season,
+            Effort = st_length(geometry),
+            Area=B,
+            date, month_abb) 
+
+effort_oct <- effort %>% 
+  dplyr::select(-c(date)) %>%
+  group_by(Region.Label,Area,Sample.Label) %>% 
+  summarise(Effort=as.numeric(sum(Effort))/1000) %>% ungroup() %>% arrange(Sample.Label)
+
+# Temp fixes for running analysis with Region.Label = month instead of season.
+# In future, create sub-transect ids when transects run in bits or repeated on same survey.
+effort_monthly <- effort
+
+effort_monthly[which(effort_monthly$Sample.Label=="cemore_2022apr7"&effort_monthly$month_abb == "May"),]$month_abb <- "Apr"
+
+effort_oct_monthly <- effort_monthly %>%
+  mutate(Region.Label=month_abb) %>%
+  group_by(Region.Label,Area,Sample.Label) %>%
+  summarise(Effort=as.numeric(sum(Effort))/1000) %>% ungroup() %>% arrange(Sample.Label) %>% 
+# effort_oct_monthly <- rbind(effort_oct_monthly[1:124,], effort_oct_monthly[126:535,]) %>%
+arrange(Sample.Label)
+
+# units(effort$Effort) <- "km"
+effort_feb <- effort %>% filter(date<date("2022-03-01")) %>% 
+  group_by(Region.Label,Area,Sample.Label) %>% 
+  summarise(Effort=as.numeric(sum(Effort))/1000) %>% ungroup()
+#-----------------------------------------
+# Region.table (region = season)
+#-----------------------------------------
+
+# reg <- data.frame(unique(effort$Region.Label), Area=B)
+# reg <- data.frame(month.abb[], Area=B)
+
+#-----------------------------------------
+# Sightings data = obs.table
+#-----------------------------------------
+sightings <- all_ap_sf %>% 
+  data.frame() %>% 
+  rename(size=Group_Size,Glare90=glare) %>%
+  mutate(Beaufort = as.numeric(as.character(Beaufort)),
+         cBeaufort = case_when(
+           Beaufort <2 ~ "0-1",
+           Beaufort == 2 ~ "2",
+           Beaufort > 2 ~ "3+"),
+         cBeaufort2 = case_when(
+           Beaufort == 0 ~ "0",
+           Beaufort == 1 ~ "1",
+           Beaufort == 2 ~ "2",
+           Beaufort > 2 ~ "3+"),
+         cGrSz2 = factor(
+           dplyr::case_when(
+             size==1 ~ "1",
+             size==2 ~ "2",
+             size==3 ~ "3",
+             size>3 ~ "4+"
+           ), levels=  c("1","2","3","4+")),
+         Observer = case_when(
+           Observer == "CMcMillan" ~ "a",
+           Observer == "EKeppel" ~"b",
+           Observer == "LSpaven" ~"c"),
+         cGrSz = factor(
+           dplyr::case_when(
+             size==1 ~ "1",
+             size==2 ~ "2",
+             size>2 ~ "3+"
+           ), levels=  c("1","2","3+")),
+         swc=factor(case_when(
+           swell %in% c("Big >2", "Moderate 1-2 m") ~ "Mod-Big Swell",
+           swell == "Low <1 m" ~ "Low Swell",
+           swell == "No swell" ~ "No swell"),
+           levels= c("No swell","Low Swell", "Mod-Big Swell")),
+         # swc2=factor(case_when(
+         #   swell == "Big >2" ~ "Big Swell",
+         #   swell %in% c("Low", "Moderate 1-2 m") ~ "Low-Mod Swell",
+         #   swell == "No swell" ~ "No swell"),
+         #   levels= c("No swell","Low-Mod Swell", "Big Swell")),
+         swc2=factor(case_when(
+           swell %in% c("Big >2", "Moderate 1-2 m") ~ "Mod-Big Swell",
+           swell %in% c("No swell", "Low <1 m") ~ "No-Low Swell"),
+           levels= c("No-Low Swell", "Mod-Big Swell")),
+         swell=factor(case_when(
+           swell %in% c("Big >2", "Moderate 1-2 m", "Low <1 m") ~ "Swell",
+           swell == "No swell" ~ "No swell"),
+           levels= c("No swell", "Swell")),
+         Visibility = case_when(
+           Visibility == "G&E"~ "G&E",
+           Visibility %in% c("Moderate", "F") ~ "Moderate",
+           Visibility == "P" ~"P"),
+         cVis = case_when(
+           Visibility == "G&E"~ "G/E",
+           !Visibility == "G&E"~ "M/P"),
+         l_glare = ifelse(Glare90 == "None", NA, l_glare) %>% as.numeric(),
+         r_glare = ifelse(Glare90 == "None", NA, r_glare) %>% as.numeric(),
+         Glare90y = ifelse(!Glare90=="None","y","n"),
+         Glare90c = ifelse(Glare90=="Severe","Severe","Mild/None"),
+         Glare45 = ifelse(l_glare %in% -45:45 | r_glare %in% -45:45, Glare90, "None"),
+         Glare45y = ifelse(Glare45=="None","n","y"),
+         Glare45c = ifelse(Glare45=="Severe","Severe","Mild/None")
+  ) %>% filter(Vessel == "MB") %>% 
+  # full_join(t) %>% 
+  mutate(
+    Region.Label= season,
+    Sample.Label=TransectID,
+         object=Sgt_ID) %>% 
+  dplyr::select(Region.Label,
+                Sample.Label,
+                date,
+                month_abb,
+                Reticle,
+                distance,
+                Species,
+                size,
+                cGrSz,
+                cGrSz2,
+                Visibility,
+                cVis,
+                Beaufort,
+                cBeaufort,
+                cBeaufort2,
+                Glare45,
+                Glare90,
+                Glare45y,
+                Glare90y,
+                Glare90c,
+                Glare45c,
+                swell,
+                swc,
+                swc2,
+                Observer
+                )
+#----------------------------------------
+sp <- "Dall's"
+ssp <- "dp"
+
+#----------------------------------------
+dp <- sightings %>% filter(Species %like% sp) 
+obs <- full_join(dp, effort_oct) 
+
+dp0.8 <- dp %>% filter(distance<=0.8)
+dp_ret <- dp %>% filter(!is.na(Reticle)) %>% dplyr::select(-Reticle)
+dp_ret0.8 <- dp_ret %>% filter(distance<=0.8)
+
+dp0.75 <- dp %>% filter(distance<=0.75)
+dp0.85 <- dp %>% filter(distance<=0.85)
+
+#----------------------------------------
+dp_feb <- dp %>% filter(date<date("2022-03-01"))
+obs_feb <- full_join(dp_feb, effort_feb) #%>% #left_join(reg) %>% 
+
+dp_feb0.8 <- dp_feb %>% filter(distance<=0.8)
+dp_feb_ret <- dp_feb %>% filter(!is.na(Reticle)) %>% dplyr::select(-Reticle)
+dp_feb_ret0.8 <- dp_feb_ret %>% filter(distance<=0.8)
+
+dp_feb0.75 <- dp_feb %>% filter(distance <=0.75)
+dp_feb0.85 <- dp_feb %>% filter(distance <=0.85)
+dp_feb0.9 <- dp_feb %>% filter(distance <=0.9)
+
+```
+
+
+
+Compare sighting distance distribution of all February sightings (N(feb) = `r nrow(dp_feb)`) 
+against only those with distance estimated using reticles (N(feb) = `r nrow(dp_feb_ret)`).
+
+Compare sighting distance distribution of all October sightings (N(oct) = `r nrow(dp)`) 
+against only those with distance estimated using reticles (N(oct) = `r nrow(dp_ret)`).
+
+
+```{r hist}
+#-----------------------------------------------------------------
+#------------------  FEB 2022  -----------------------
+#-----------------------------------------------------------------
+par(mfrow=c(1,2))
+terra::hist(dp_feb$distance, xlab="Distance (km)", breaks=seq(0,max(dp_feb$distance),len=30),
+            main=paste0(ssp, " to Feb 2022-30bins"))#, xlim = range(c(0,4)))  
+terra::hist(dp_feb$distance, xlab="Distance (km)",breaks=seq(0,max(dp_feb$distance),len=60),
+            main=paste0(ssp, " to Feb 2022-60bins"))#, xlim = range(c(0,4)))
+
+par(mfrow=c(1,2))
+terra::hist(dp_feb_ret$distance, xlab="Distance (km)", breaks=seq(0,max(dp_feb_ret$distance),len=30),
+            main=paste0(ssp, " to Feb 2022 ret only-30bins"))#, xlim = range(c(0,4)))  
+terra::hist(dp_feb_ret$distance, xlab="Distance (km)",breaks=seq(0,max(dp_feb_ret$distance),len=60),
+            main=paste0(ssp, " to Feb 2022 ret only-60bins"))#, xlim = range(c(0,4)))
+
+
+#-----------------------------------------------------------------
+#------------------  OCT 2022  -----------------------
+#-----------------------------------------------------------------
+par(mfrow=c(1,2))
+terra::hist(dp$distance, xlab="Distance (km)", breaks=seq(0,max(dp$distance),len=30), # seq(0,3.2,by=0.1)
+            main=paste0(ssp, " to ", survey_title, "-30bins"))#, xlim = range(c(0,4)))  
+terra::hist(dp$distance, xlab="Distance (km)",breaks=seq(0,max(dp$distance),len=60),
+            main=paste0(ssp, " to ", survey_title, "-60bins"))#, xlim = range(c(0,4)))
+
+par(mfrow=c(1,2))
+terra::hist(dp_ret$distance, xlab="Distance (km)", breaks=seq(0,max(dp_ret$distance),len=30),
+            main=paste0(ssp, " to ", survey_title, " ret only-30bins"))#, xlim = range(c(0,4)))  
+terra::hist(dp_ret$distance, xlab="Distance (km)",breaks=seq(0,max(dp_ret$distance),len=60),
+            main=paste0(ssp, " to ", survey_title, " ret only-60bins"))#, xlim = range(c(0,4)))
+
+```
+
+# Dall's porpoise data to February 2022
+
+## Feb models 0.9 (as done in Feb) and 0.8 km truncation (looks best for data to Oct)
+
+Compare models here using delta AIC.
+
+```{r feb-all-models}
+#---- 0.9 km --------------
+dp0.9.un     <-ds(obs_feb, key = "un", truncation = 0.9)   
+dp0.9.hn         <-ds(obs_feb, key = "hn", truncation = 0.9)    
+dp0.9.hr         <-ds(obs_feb, key = "hr", truncation = 0.9)    
+dp0.9.hn.sw      <-ds(obs_feb, 0.9, key="hn", formula=~swell)
+dp0.9.hn.g90y    <-ds(obs_feb, 0.9, key="hn", formula=~Glare90y)              
+dp0.9.hn.sw.g90y <-ds(obs_feb, 0.9, key="hn", formula=~swell+Glare90y)        
+
+model.table.feb.allsgt0.9 <- summarize_ds_models(dp0.9.un,
+                                                  dp0.9.hn        ,
+                                                  dp0.9.hr        ,
+                                                  dp0.9.hn.sw     ,
+                                                  dp0.9.hn.g90y   ,
+                                                  dp0.9.hn.sw.g90y,
+                                                  output="plain") %>% 
+  tibble::as_tibble()  %>% 
+  rename("SE (Avg det)"="se(Average detectability)",
+         "Avg det"="Average detectability",
+         "CvM"="C-vM $p$-value",
+         "dAIC" = "Delta AIC") %>% 
+  dplyr::select(-Model)
+
+tab.ft0.9 <-  model.table.feb.allsgt0.9$`Key function`[which(nchar(model.table.feb.allsgt0.9$`Key function`) >11)]
+
+model.table.feb.allsgt0.9 %<>% mutate(`Key function` = case_when(
+    nchar(`Key function`)>12 ~ paste0(substring(`Key function`, 1,11),"*"),
+    nchar(`Key function`) <=12 ~ `Key function`))
+
+
+cap <- paste(ssp, " models to Feb 2022, all sgt. Trunc = 0.9 km. N = ", nrow(dp_feb0.9))
+m_feb_all0.9 <- kableExtra::kable(model.table.feb.allsgt0.9, digits=3, row.names = FALSE, escape=FALSE,
+      caption = cap) %>%
+  kableExtra::footnote(paste0("* ", tab.ft0.9)) %>% 
+  kableExtra::kable_styling(latex_options = "hold_position")
+m_feb_all0.9
+
+#---- 0.8 km --------------
+dp0.8.un     <-ds(obs_feb, key = "un", truncation = 0.8)   
+dp0.8.hn         <-ds(obs_feb, key = "hn", truncation = 0.8)    
+dp0.8.hr         <-ds(obs_feb, key = "hr", truncation = 0.8)    
+dp0.8.hn.sw      <-ds(obs_feb, 0.8, key="hn", formula=~swell)
+dp0.8.hn.g90y    <-ds(obs_feb, 0.8, key="hn", formula=~Glare90y)              
+dp0.8.hn.sw.g90y <-ds(obs_feb, 0.8, key="hn", formula=~swell+Glare90y)        
+dp0.8.hn.sw..g90y <-ds(obs_feb, 0.8, key="hn", formula=~swell*Glare90y)        
+
+model.table.feb.allsgt0.8 <- summarize_ds_models(dp0.8.un,
+                                                 dp0.8.hn        ,
+                                                 dp0.8.hr        ,
+                                                 dp0.8.hn.sw     ,
+                                                 dp0.8.hn.g90y   ,
+                                                 dp0.8.hn.sw.g90y,
+                                                 dp0.8.hn.sw..g90y,
+                                                 output="plain") %>% 
+  tibble::as_tibble()  %>% 
+  rename("SE (Avg det)"="se(Average detectability)",
+         "Avg det"="Average detectability",
+         "CvM"="C-vM $p$-value",
+         "dAIC" = "Delta AIC") %>% 
+  dplyr::select(-Model)
+
+tab.ft0.8 <-  model.table.feb.allsgt0.8$`Key function`[which(nchar(model.table.feb.allsgt0.8$`Key function`) >11)]
+
+model.table.feb.allsgt0.8 %<>% mutate(`Key function` = case_when(
+    nchar(`Key function`)>12 ~ paste0(substring(`Key function`, 1,11),"*"),
+    nchar(`Key function`) <=12 ~ `Key function`))
+
+
+cap <- paste(ssp, " models to Feb 2022, all sgt. Trunc = 0.8 km. N = ", nrow(dp_feb0.8))
+m_feb_all0.8 <- kableExtra::kable(model.table.feb.allsgt0.8, digits=3, row.names = FALSE, escape=FALSE,
+      caption = cap) %>%
+  kableExtra::footnote(paste0("* ", tab.ft0.8)) %>% 
+  kableExtra::kable_styling(latex_options = "hold_position")
+m_feb_all0.8
+# #---- 0.85 km----------------
+# dp0.85.un   <-ds(obs_feb, key = "un", truncation = 0.85)
+# dp0.85.hn       <-ds(obs_feb, key = "hn", truncation = 0.85)
+# dp0.85.hr       <-ds(obs_feb, key = "hr", truncation = 0.85)
+# dp0.85.hn.bfc   <-ds(obs_feb, 0.85, key="hn", formula=~cBeaufort)
+# dp0.85.hn.ob    <-ds(obs_feb, 0.85, key="hn", formula=~Observer)
+# dp0.85.hn.bfc.ob   <-ds(obs_feb, 0.85, key="hn", formula=~cBeaufort+Observer)
+# 
+# model.table.feb.allsgt0.85 <- summarize_ds_models(
+#   dp0.85.un   ,
+#   dp0.85.hn       ,
+#   dp0.85.hr       ,
+#   dp0.85.hn.bfc   ,
+#   dp0.85.hn.ob    ,
+#   dp0.85.hn.bfc.ob,
+#   output="plain") %>%
+#   tibble::as_tibble()  %>%
+#   rename("SE (Avg det)"="se(Average detectability)",
+#          "Avg det"="Average detectability",
+#          "CvM"="C-vM $p$-value",
+#          "dAIC" = "Delta AIC") %>%
+#   dplyr::select(-Model)
+# 
+# tab.ft0.85 <-  model.table.feb.allsgt0.85$`Key function`[which(nchar(model.table.feb.allsgt0.85$`Key function`) >11)]
+# 
+# model.table.feb.allsgt0.85 %<>% mutate(`Key function` = case_when(
+#     nchar(`Key function`)>12 ~ paste0(substring(`Key function`, 1,11),"*"),
+#     nchar(`Key function`) <=12 ~ `Key function`))
+# 
+# 
+# cap <- paste(ssp, " models to Feb 2022, all sgt. Trunc = 0.85 km. N = ", nrow(dp_feb0.85))
+# m_feb_all0.85 <- kableExtra::kable(model.table.feb.allsgt0.85, digits=3, row.names = FALSE, escape=FALSE,
+#       caption = cap) %>%
+#   kableExtra::footnote(paste0("* ", tab.ft0.85)) %>%
+#   kableExtra::kable_styling(latex_options = "hold_position")
+# m_feb_all0.85
+
+
+
+#-----------------------------------
+
+# par(mfrow=c(1,2))
+# plot_df(sp,dp0.85.hn.bfc.ob, showpoints=F)
+# plot_df(sp,dp0.85.hn.bfc, showpoints=F)
+
+par(mfrow=c(1,2))
+plot_df(sp,dp0.9.hn.sw.g90y, showpoints=F)
+plot_df(sp,dp0.9.hn.sw, showpoints=F)
+
+par(mfrow=c(1,2))
+plot_df(sp,dp0.8.hn.sw.g90y, showpoints=F)
+plot_df(sp,dp0.8.hn.sw, showpoints=F)
+
+plot_df(sp,dp0.8.hn.sw..g90y, showpoints=F)
+
+```
+
+## Feb abundance at truncation 0.9 km and 0.8 km
+
+```{r feb-all-abund}
+#---------------------------------
+# abundance - 0.9 km
+#---------------------------------
+er <- dp0.9.hn.sw.g90y$dht$individuals$summary[,c(1,5,6,8,9)]
+names(er) <- c("Season", "n", "ER", "cv.ER", "GS")
+Nhat_t <- dp0.9.hn.sw.g90y$dht$individuals$N[,c(1,2,4,5,6)]
+names(Nhat_t) <- c("Season", "N", "cv.N", "L95", "U95")
+
+dp_ab <- full_join(er, Nhat_t) %>% tibble::as_tibble() %>% 
+  mutate_if(is.numeric, round, digits = 2)
+
+t_feb_all_abund_sw_g90y0.9 <- kableExtra::kable(dp_ab, digits=3, row.names = FALSE, escape=FALSE,
+      caption = paste(first_up(ssp), " abund to Feb 2022, all sgt, hn + swell + glare (y/n) to 90 degrees. Trunc = 0.9 km.")) %>% 
+  kableExtra::kable_styling(latex_options = "hold_position")
+t_feb_all_abund_sw_g90y0.9
+#-----------------
+er <- dp0.9.hn.sw$dht$individuals$summary[,c(1,5,6,8,9)]
+names(er) <- c("Season", "n", "ER", "cv.ER", "GS")
+Nhat_t <- dp0.9.hn.sw$dht$individuals$N[,c(1,2,4,5,6)]
+names(Nhat_t) <- c("Season", "N", "cv.N", "L95", "U95")
+
+dp_ab <- full_join(er, Nhat_t) %>% tibble::as_tibble() %>% 
+  mutate_if(is.numeric, round, digits = 2)
+
+t_feb_all_abund_sw0.9 <- kableExtra::kable(dp_ab, digits=3, row.names = FALSE, escape=FALSE,
+      caption = paste(first_up(ssp), " abund to Feb 2022, all sgt, hn + swell Trunc = 0.9 km.")) %>% 
+  kableExtra::kable_styling(latex_options = "hold_position")
+t_feb_all_abund_sw0.9
+#--------------------------------------------------
+
+#---------------------------------
+# abundance - 0.8 km
+#---------------------------------
+er <- dp0.8.hn.sw.g90y$dht$individuals$summary[,c(1,5,6,8,9)]
+names(er) <- c("Season", "n", "ER", "cv.ER", "GS")
+Nhat_t <- dp0.8.hn.sw.g90y$dht$individuals$N[,c(1,2,4,5,6)]
+names(Nhat_t) <- c("Season", "N", "cv.N", "L95", "U95")
+
+dp_ab <- full_join(er, Nhat_t) %>% tibble::as_tibble() %>% 
+  mutate_if(is.numeric, round, digits = 2)
+
+t_feb_all_abund_sw_g90y0.8 <- kableExtra::kable(dp_ab, digits=3, row.names = FALSE, escape=FALSE,
+      caption = paste(first_up(ssp), " abund to Feb 2022, all sgt, hn + swell + glare (y/n) to 90 degrees. Trunc = 0.8 km.")) %>% 
+  kableExtra::kable_styling(latex_options = "hold_position")
+t_feb_all_abund_sw_g90y0.8
+#-----------------
+er <- dp0.8.hn.sw$dht$individuals$summary[,c(1,5,6,8,9)]
+names(er) <- c("Season", "n", "ER", "cv.ER", "GS")
+Nhat_t <- dp0.8.hn.sw$dht$individuals$N[,c(1,2,4,5,6)]
+names(Nhat_t) <- c("Season", "N", "cv.N", "L95", "U95")
+
+dp_ab <- full_join(er, Nhat_t) %>% tibble::as_tibble() %>% 
+  mutate_if(is.numeric, round, digits = 2)
+
+t_feb_all_abund_sw0.8 <- kableExtra::kable(dp_ab, digits=3, row.names = FALSE, escape=FALSE,
+      caption = paste(first_up(ssp), " abund to Feb 2022, all sgt, hn + swell Trunc = 0.8 km.")) %>% 
+  kableExtra::kable_styling(latex_options = "hold_position")
+t_feb_all_abund_sw0.8
+
+
+
+```
+
+\clearpage
+
+## Feb reticle only models and abund est using half-normal model with covariates swell and glare to 90 degrees (y/n, not recorded mild/mod/severe)
+
+```{r feb-ret-sgt}
+obs_ret_feb <- full_join(dp_feb_ret, effort_feb) #%>% #left_join(reg) %>%
+
+dp0.8.un.r     <-ds(obs_ret_feb, key = "un", truncation = 0.8)   
+dp0.8.hn.r         <-ds(obs_ret_feb, key = "hn", truncation = 0.8)    
+dp0.8.hn.g90y.r    <-ds(obs_ret_feb, 0.8, key="hn", formula=~Glare90y)         
+dp0.8.hn.sw.r      <-ds(obs_ret_feb, 0.8, key="hn", formula=~swell)            
+dp0.8.hn.sw.g90y.r <-ds(obs_ret_feb, 0.8, key="hn", formula=~swell+Glare90y)         
+
+model.table.feb.ret <- summarize_ds_models(dp0.8.un.r     ,
+                                           dp0.8.hn.r         ,
+                                           dp0.8.hn.g90y.r    ,
+                                           dp0.8.hn.sw.r      ,
+                                           dp0.8.hn.sw.g90y.r ,
+                                           output="plain") %>% 
+  tibble::as_tibble()  %>% 
+  rename("SE (Avg det)"="se(Average detectability)",
+         "Avg det"="Average detectability",
+         "CvM"="C-vM $p$-value",
+         "dAIC" = "Delta AIC") %>% 
+  dplyr::select(-Model)
+
+tab.ft0.8 <-  model.table.feb.ret$`Key function`[which(nchar(model.table.feb.ret$`Key function`) >11)]
+
+model.table.feb.ret %<>% mutate(`Key function` = case_when(
+    nchar(`Key function`)>12 ~ paste0(substring(`Key function`, 1,11),"*"),
+    nchar(`Key function`) <=12 ~ `Key function`))
+
+cap <- paste(ssp, " models to Feb 2022, ret only. Trunc = 0.8 km. N = ", nrow(dp_feb_ret %>% filter(distance < 0.8)))
+m_feb_ret <- kableExtra::kable(model.table.feb.ret, digits=3, row.names = FALSE, escape=FALSE,
+                               caption = cap) %>%
+  kableExtra::footnote(paste0("* ", tab.ft0.8)) %>% 
+  kableExtra::kable_styling(latex_options = "hold_position")
+m_feb_ret
+#----------------------------------------------------
+# encounter rate and group size
+er <- dp0.8.hn.sw.g90y.r$dht$individuals$summary[,c(1,5,6,8,9)]
+names(er) <- c("Season", "n", "ER", "cv.ER", "GS")
+# abundance
+Nhat_t <- dp0.8.hn.sw.g90y.r$dht$individuals$N[,c(1,2,4,5,6)]
+names(Nhat_t) <- c("Season", "N", "cv.N", "L95", "U95")
+
+dp_ab_ret_feb <- full_join(er, Nhat_t) %>% tibble::as_tibble() %>% 
+  mutate_if(is.numeric, round, digits = 2)
+
+t_feb_ret_abund0.8r <- kableExtra::kable(dp_ab_ret_feb, digits=3, row.names = FALSE, escape=FALSE,
+      caption = paste(ssp, " abund to Feb 2022, ret, HN + bfc + obs model. Trunc = 0.8 km.")) %>% 
+  kableExtra::kable_styling(latex_options = "hold_position")
+#%>%  kableExtra::landscape()
+t_feb_ret_abund0.8r
+```
+
+## Feb dp model covariates sighting distance distribution
+
+```{r dp-feb-cov}
+# t_ob   <- table(dp_feb0.8$Observer)
+# table(dp_feb0.8$cBeaufort)
+# table(dp_feb0.8$Beaufort)
+# table(dp_feb0.8$cGrSz)
+# table(dp_feb0.8$size)
+
+v_sw <- dp_feb0.8 %>% data.frame() %>% count(swell) 
+ggplot(data = dp_feb0.8, aes(x=swell, y=distance)) + 
+ geom_violin()+ 
+ # stat_summary(fun=mean, geom="pointrange", shape=23, size=2) geom_boxplot(width=0.1)+ 
+ geom_text(data=v_sw,
+           aes(swell,max(dp_feb0.8$distance)+(0.05*max(dp_feb0.8$distance)),label=n,size=0.1),size=3,vjust = -0.5)+ 
+ # stat_summary(fun.data=mean_sdl, geom="pointrange")+ ylab("Perpendicular sighting distance (km)")+
+ xlab("Swell") 
+
+v_g90y <- dp_feb0.8 %>% data.frame() %>% count(Glare90y = as.character(Glare90y))
+ggplot(data = dp_feb0.8, aes(x=as.character(Glare90y), y=distance)) + 
+ geom_violin() + 
+ # stat_summary(fun=mean, geom="pointrange", shape=23, size=2) geom_boxplot(width=0.1)+ 
+ geom_text(data=v_g90y,
+           aes(as.character(Glare90y),max(dp_feb0.8$distance)+(0.05*max(dp_feb0.8$distance)),label=n,size=0.1),size=3,vjust = -0.5)+ 
+ # stat_summary(fun.data=mean_sdl, geom="pointrange")+ ylab("Perpendicular sighting distance (km)")+
+xlab("Glare to 90 degrees (y/n)") 
+
+```
+
+
+
+\clearpage
+
+# Dall's porpoise data to October 2022
+
+## Examine truncation distance for key only models.
+
+```{r oct-trunc-key}
+#--------------------
+
+dp0.75.un   <-ds(obs, key = "un", truncation = 0.75)   
+dp0.75.hn       <-ds(obs, key = "hn", truncation = 0.75)    
+dp0.75.hr       <-ds(obs, key = "hr", truncation = 0.75)    
+
+model.table.oct.allsgt0.75 <- summarize_ds_models(
+  dp0.75.un ,
+  dp0.75.hn,
+  dp0.75.hr,
+  output="plain") %>% 
+  tibble::as_tibble()  %>% 
+  rename("SE (Avg det)"="se(Average detectability)",
+         "Avg det"="Average detectability",
+         "CvM"="C-vM $p$-value",
+         "dAIC" = "Delta AIC") %>% 
+  dplyr::select(-Model)
+
+tab.ft0.75 <-  model.table.oct.allsgt0.75$`Key function`[which(nchar(model.table.oct.allsgt0.75$`Key function`) >11)]
+model.table.oct.allsgt0.75 %<>% mutate(`Key function` = case_when(
+    nchar(`Key function`)>12 ~ paste0(substring(`Key function`, 1,11),"*"),
+    nchar(`Key function`) <=12 ~ `Key function`))
+
+cap <- paste(ssp, " Comparison of models to October 2022, all sightings Truncation = 0.75 km. N = ", nrow(dp0.75))
+m_oct_all0.75 <- kableExtra::kable(model.table.oct.allsgt0.75, digits=3, row.names = FALSE, escape=FALSE,
+      caption = cap) %>%
+  kableExtra::footnote(paste0("* ", tab.ft0.75)) %>% 
+  kableExtra::kable_styling(latex_options = "hold_position")
+m_oct_all0.75
+#--------------------
+
+dp0.8.un       <-ds(obs, key = "un", truncation = 0.8)   
+dp0.8.hn       <-ds(obs, key = "hn", truncation = 0.8)    
+dp0.8.hr       <-ds(obs, key = "hr", truncation = 0.8)    
+
+model.table.oct.allsgt0.8 <- summarize_ds_models(
+  dp0.8.un ,
+  dp0.8.hn,
+  dp0.8.hr,
+  output="plain") %>% 
+  tibble::as_tibble()  %>% 
+  rename("SE (Avg det)"="se(Average detectability)",
+         "Avg det"="Average detectability",
+         "CvM"="C-vM $p$-value",
+         "dAIC" = "Delta AIC") %>% 
+  dplyr::select(-Model)
+
+tab.ft0.8 <-  model.table.oct.allsgt0.8$`Key function`[which(nchar(model.table.oct.allsgt0.8$`Key function`) >11)]
+model.table.oct.allsgt0.8 %<>% mutate(`Key function` = case_when(
+    nchar(`Key function`)>12 ~ paste0(substring(`Key function`, 1,11),"*"),
+    nchar(`Key function`) <=12 ~ `Key function`))
+
+cap <- paste(ssp, " Comparison of models to October 2022, all sightings Truncation = 0.8 km. N = ", nrow(dp0.8))
+m_oct_all0.8 <- kableExtra::kable(model.table.oct.allsgt0.8, digits=3, row.names = FALSE, escape=FALSE,
+      caption = cap) %>%
+  kableExtra::footnote(paste0("* ", tab.ft0.8)) %>% 
+  kableExtra::kable_styling(latex_options = "hold_position")
+m_oct_all0.8
+#--------------------
+dp0.85.un   <-ds(obs, key = "un", truncation = 0.85)   
+dp0.85.hn       <-ds(obs, key = "hn", truncation = 0.85)    
+dp0.85.hr       <-ds(obs, key = "hr", truncation = 0.85)    
+
+model.table.oct.allsgt0.85 <- summarize_ds_models(
+  dp0.85.un ,
+  dp0.85.hn,
+  dp0.85.hr,
+  output="plain") %>% 
+  tibble::as_tibble()  %>% 
+  rename("SE (Avg det)"="se(Average detectability)",
+         "Avg det"="Average detectability",
+         "CvM"="C-vM $p$-value",
+         "dAIC" = "Delta AIC") %>% 
+  dplyr::select(-Model)
+
+tab.ft0.85 <-  model.table.oct.allsgt0.85$`Key function`[which(nchar(model.table.oct.allsgt0.85$`Key function`) >11)]
+model.table.oct.allsgt0.85 %<>% mutate(`Key function` = case_when(
+    nchar(`Key function`)>12 ~ paste0(substring(`Key function`, 1,11),"*"),
+    nchar(`Key function`) <=12 ~ `Key function`))
+
+cap <- paste(ssp, " Comparison of models to October 2022, all sightings Truncation = 0.85 km. N = ", nrow(dp0.85))
+m_oct_all0.85 <- kableExtra::kable(model.table.oct.allsgt0.85, digits=3, row.names = FALSE, escape=FALSE,
+      caption = cap) %>%
+  kableExtra::footnote(paste0("* ", tab.ft0.85)) %>% 
+  kableExtra::kable_styling(latex_options = "hold_position")
+m_oct_all0.85
+#-------------------
+par(mfrow=c(1,3))
+plot_df(sp, dp0.75.un)
+plot_df(sp, dp0.75.hn)
+plot_df(sp, dp0.75.hr)
+
+par(mfrow=c(1,3))
+plot_df(sp, dp0.8.un)
+plot_df(sp, dp0.8.hn)
+plot_df(sp, dp0.8.hr)
+
+par(mfrow=c(1,3))
+plot_df(sp, dp0.85.un)
+plot_df(sp, dp0.85.hn)
+plot_df(sp, dp0.85.hr)
+
+```
+
+## Explore single covariate models
+
+Compare key-only and single-covariate models.
+
+```{r oct-cov}
+# Test single-covariates with half-normal - "#" = not enough samples in each category
+dp0.8.hn.v    <-ds(obs, 0.8, key="hn", formula=~Visibility)
+dp0.8.hn.vc   <-ds(obs, 0.8, key="hn", formula=~cVis)  #clumped vis does better
+dp0.8.hn.bf   <-ds(obs, 0.8, key="hn", formula=~Beaufort)  # unclumped does better
+dp0.8.hn.bfc  <-ds(obs, 0.8, key="hn", formula=~cBeaufort)
+dp0.8.hn.szc2 <-ds(obs, 0.8, key="hn", formula=~cGrSz2)
+dp0.8.hn.szc  <-ds(obs, 0.8, key="hn", formula=~cGrSz)
+dp0.8.hn.sz   <-ds(obs, 0.8, key="hn", formula=~size) # unclumped better
+# dp0.8.hn.g90  <-ds(obs, 0.8, key="hn", formula=~Glare90)
+# dp0.8.hn.g90y <-ds(obs, 0.8, key="hn", formula=~Glare90y)
+dp0.8.hn.g90c <-ds(obs, 0.8, key="hn", formula=~Glare90c)
+dp0.8.hn.g45c <-ds(obs, 0.8, key="hn", formula=~Glare45c)       # best for glare - no/mild vs. sev        
+# dp0.8.hn.g45y <-ds(obs, 0.8, key="hn", formula=~Glare45y)
+dp0.8.hn.sw   <-ds(obs, 0.8, key="hn", formula=~swell) # unclumped does better
+dp0.8.hn.swc   <-ds(obs, 0.8, key="hn", formula=~swc)
+dp0.8.hn.swc2  <-ds(obs, 0.8, key="hn", formula=~swc2)
+dp0.8.hn.ob   <-ds(obs, 0.8, key="hn", formula=~Observer)           
+
+model.table.oct.allsgt0.8 <- summarize_ds_models(
+  # dp0.8.hn.v   , breaks summary table - not sure why
+dp0.8.hn.vc  ,
+dp0.8.hn.bf  ,
+dp0.8.hn.bfc ,
+dp0.8.hn.szc2 ,
+dp0.8.hn.szc ,
+dp0.8.hn.sz  ,
+dp0.8.hn.g90c,
+dp0.8.hn.g45c,
+dp0.8.hn.sw  ,
+dp0.8.hn.swc ,
+dp0.8.hn.swc2,
+dp0.8.hn.ob  ,
+  dp0.8.un,
+  dp0.8.hn     ,
+  dp0.8.hr     ,
+  output="plain") %>% 
+  tibble::as_tibble()  %>% 
+  rename("SE (Avg det)"="se(Average detectability)",
+         "Avg det"="Average detectability",
+         "CvM"="C-vM $p$-value",
+         "dAIC" = "Delta AIC") %>% 
+  dplyr::select(-Model)
+
+tab.ft0.8 <-  model.table.oct.allsgt0.8$`Key function`[which(nchar(model.table.oct.allsgt0.8$`Key function`) >11)]
+model.table.oct.allsgt0.8 %<>% mutate(`Key function` = case_when(
+    nchar(`Key function`)>12 ~ paste0(substring(`Key function`, 1,11),"*"),
+    nchar(`Key function`) <=12 ~ `Key function`))
+
+cap <- paste(ssp, " Comparison of models to October 2022, all sightings Truncation = 0.8 km. N = ", nrow(dp0.8))
+m_oct_all0.8 <- kableExtra::kable(model.table.oct.allsgt0.8, digits=3, row.names = FALSE, escape=FALSE,
+      caption = cap) %>%
+  kableExtra::footnote(paste0("* ", tab.ft0.8)) %>% 
+  kableExtra::kable_styling(latex_options = "hold_position")
+m_oct_all0.8
+
+par(mfrow=c(1,2))
+plot_df(sp, dp0.8.un, showpoints=F)
+plot_df(sp, dp0.8.hn.sw, showpoints=F)
+# plot_df(sp, dp0.8.hn.g90y, showpoints=F)
+```
+
+<!-- \clearpage -->
+
+## Oct dp covariates sighting distance distribution
+
+```{r dp-oct-cov}
+table(dp0.8$Beaufort)
+table(dp0.8$cBeaufort)
+table(dp0.8$cBeaufort2)
+table(dp0.8$size)
+table(dp0.8$cGrSz)
+table(dp0.8$cGrSz2)
+table(dp0.8$Observer)
+table(dp0.8$Glare90)
+
+v_sw <- dp0.8 %>% data.frame() %>% count(swell = as.character(swell))
+ggplot(data = dp0.8, aes(x=as.character(swell), y=distance)) + 
+ geom_violin()+ 
+ # stat_summary(fun=mean, geom="pointrange", shape=23, size=2) geom_boxplot(width=0.1)+ 
+ geom_text(data=v_sw,
+           aes(as.character(swell),max(dp0.8$distance)+(0.05*max(dp0.8$distance)),label=n,size=0.1),size=3,vjust = -0.5)+ 
+ # stat_summary(fun.data=mean_sdl, geom="pointrange")+ ylab("Perpendicular sighting distance (km)")+
+xlab("Swell") 
+
+v_g90y <- dp0.8 %>% data.frame() %>% count(Glare90y) 
+ggplot(data = dp0.8, aes(x=Glare90y, y=distance)) + 
+ geom_violin()+ 
+ # stat_summary(fun=mean, geom="pointrange", shape=23, size=2) geom_boxplot(width=0.1)+ 
+ geom_text(data=v_g90y,
+           aes(Glare90y,max(dp0.8$distance)+(0.05*max(dp0.8$distance)),label=n,size=0.1),size=3,vjust = -0.5)+ 
+ # stat_summary(fun.data=mean_sdl, geom="pointrange")+ ylab("Perpendicular sighting distance (km)")+
+ xlab("Glare to 90 degrees (y/n)")
+
+v_g90 <- dp0.8 %>% data.frame() %>% count(Glare90) 
+ggplot(data = dp0.8, aes(x=Glare90, y=distance)) + 
+ geom_violin()+ 
+ # stat_summary(fun=mean, geom="pointrange", shape=23, size=2) geom_boxplot(width=0.1)+ 
+ geom_text(data=v_g90,
+           aes(Glare90,max(dp0.8$distance)+(0.05*max(dp0.8$distance)),label=n,size=0.1),size=3,vjust = -0.5)+ 
+ # stat_summary(fun.data=mean_sdl, geom="pointrange")+ ylab("Perpendicular sighting distance (km)")+
+ xlab("Glare to 90 degrees (levels)")
+
+v_g45c <- dp0.8 %>% data.frame() %>% count(Glare45c) 
+ggplot(data = dp0.8, aes(x=Glare45c, y=distance)) + 
+ geom_violin()+ 
+ # stat_summary(fun=mean, geom="pointrange", shape=23, size=2) geom_boxplot(width=0.1)+ 
+ geom_text(data=v_g45c,
+           aes(Glare45c,max(dp0.8$distance)+(0.05*max(dp0.8$distance)),label=n,size=0.1),size=3,vjust = -0.5)+ 
+ # stat_summary(fun.data=mean_sdl, geom="pointrange")+ ylab("Perpendicular sighting distance (km)")+
+ xlab("Glare to 45 degrees (severe vs mild/none)")
+
+v_bfc <- dp0.8 %>% data.frame() %>% count(cBeaufort = as.character(cBeaufort))
+ggplot(data = dp0.8, aes(x=as.character(cBeaufort), y=distance)) + 
+ geom_violin()+ 
+ # stat_summary(fun=mean, geom="pointrange", shape=23, size=2) geom_boxplot(width=0.1)+ 
+ geom_text(data=v_bfc,
+           aes(as.character(cBeaufort),max(dp0.8$distance)+(0.05*max(dp0.8$distance)),label=n,size=0.1),size=3,vjust = -0.5)+ 
+ # stat_summary(fun.data=mean_sdl, geom="pointrange")+ ylab("Perpendicular sighting distance (km)")+
+xlab("Clumped Beaufort (0-1, 2, 3+") 
+
+v_ob <- dp0.8 %>% data.frame() %>% count(Observer = as.character(Observer))
+ggplot(data = dp0.8, aes(x=as.character(Observer), y=distance)) + 
+ geom_violin()+ 
+ # stat_summary(fun=mean, geom="pointrange", shape=23, size=2) geom_boxplot(width=0.1)+ 
+ geom_text(data=v_ob,
+           aes(as.character(Observer),max(dp0.8$distance)+(0.05*max(dp0.8$distance)),label=n,size=0.1),size=3,vjust = -0.5)+ 
+ # stat_summary(fun.data=mean_sdl, geom="pointrange")+ ylab("Perpendicular sighting distance (km)")+
+xlab("Observer") 
+
+v_szc <- dp0.8 %>% data.frame() %>% count(cGrSz = as.character(cGrSz))
+ggplot(data = dp0.8, aes(x=as.character(cGrSz), y=distance)) + 
+ geom_violin()+ 
+ # stat_summary(fun=mean, geom="pointrange", shape=23, size=2) geom_boxplot(width=0.1)+ 
+ geom_text(data=v_szc,
+           aes(as.character(cGrSz),max(dp0.8$distance)+(0.05*max(dp0.8$distance)),label=n,size=0.1),size=3,vjust = -0.5)+ 
+ # stat_summary(fun.data=mean_sdl, geom="pointrange")+ ylab("Perpendicular sighting distance (km)")+
+xlab("Clumped group size (1, 2, 3+)") 
+```
+
+## Additive and Interactive covariate effects
+
+Compare best performing model (hn + swell) with models incorporating other cov's.
+Showing best models here only. Selection was performed for multiple covariate models
+using forward selection.
+
+```{r mc0.8}
+#---- additive effects ----
+
+#---------------------------------------------------------------------
+# Multiple covariates - forward selection
+#---------------------------------------------------------------------
+ 
+dp0.8.hn.sw           <- ds(obs, 0.8, key="hn", formula=~swell)  # -83.907
+dp0.8.hn.g45c         <- ds(obs, 0.8, key="hn", formula=~Glare45c)  # -80.765
+dp0.8.hn.g90c         <- ds(obs, 0.8, key="hn", formula=~Glare90c)
+dp0.8.hn.sw.g90c        <- ds(obs, 0.8, key="hn", formula=~swell + Glare90c)              # -86.008
+dp0.8.hn.sw.g90       <- ds(obs, 0.8, key="hn", formula=~swell + Glare90)
+dp0.8.hn.sw.g45c      <- ds(obs, 0.8, key="hn", formula=~swell + Glare45c)
+dp0.8.hn.sw.bfc         <- ds(obs, 0.8, key="hn", formula=~swell + cBeaufort)               # -80.117
+dp0.8.hn.sw.szc         <- ds(obs, 0.8, key="hn", formula=~swell + cGrSz)                   # -80.225
+dp0.8.hn.sw.g45c.szc     <- ds(obs, 0.8, key="hn", formula=~swell + Glare45c + cGrSz)       #  -82..618
+dp0.8.hn.sw.g45c.bfc     <- ds(obs, 0.8, key="hn", formula=~swell + Glare45c + cBeaufort )    #  -83.415
+
+
+model.table.oct.allsgt.add <- summarize_ds_models(
+  dp0.8.un,
+  dp0.8.hn     ,
+  dp0.8.hn.sw         ,
+dp0.8.hn.g45c       ,
+dp0.8.hn.g90c       ,
+dp0.8.hn.sw.g90c    ,
+dp0.8.hn.sw.g90     ,
+dp0.8.hn.sw.g45c    ,
+dp0.8.hn.sw.bfc     ,
+dp0.8.hn.sw.szc     ,
+dp0.8.hn.sw.g45c.szc,
+dp0.8.hn.sw.g45c.bfc,
+  output="plain") 
+rn <- row.names(model.table.oct.allsgt.add)
+model.table.oct.allsgt.add <- model.table.oct.allsgt.add %>% arrange(rn) %>% 
+  tibble::as_tibble()  %>% 
+  rename("SE (Avg det)"="se(Average detectability)",
+         "Avg det"="Average detectability",
+         "CvM"="C-vM $p$-value",
+         "dAIC" = "Delta AIC") %>% 
+  dplyr::select(-Model)
+tab.ft0.8 <-  model.table.oct.allsgt.add$`Key function`[which(nchar(model.table.oct.allsgt.add$`Key function`) >11)]
+model.table.oct.allsgt.add %<>% mutate(`Key function` = case_when(
+    nchar(`Key function`)>12 ~ paste0(substring(`Key function`, 1,11),"*"),
+    nchar(`Key function`) <=12 ~ `Key function`))
+
+cap <- paste(ssp, " additive effect of covariates to Oct 2022, all sightings Truncation = 0.8 km.")
+m_oct_add <- kableExtra::kable(model.table.oct.allsgt.add, digits=3, row.names = FALSE, escape=FALSE,
+      caption = cap) %>%
+  kableExtra::footnote(paste0("* ", tab.ft0.8)) %>% 
+  kableExtra::kable_styling(latex_options = "hold_position")
+m_oct_add
+
+#---- interactions -----
+dp0.8.hn.obs..sw     <-ds(obs, key = "hn", truncation = 0.8, formula=~Observer*swell)
+dp0.8.hn.obs..bfc    <-ds(obs, key = "hn", truncation = 0.8, formula=~Observer*cBeaufort)
+dp0.8.hn.sw..bfc     <-ds(obs, key = "hn", truncation = 0.8, formula=~swell*cBeaufort)
+dp0.8.hn.sw..g90c     <-ds(obs, key = "hn", truncation = 0.8, formula=~swell*Glare90c)
+dp0.8.hn.sw..g90     <-ds(obs, key = "hn", truncation = 0.8, formula=~swell*Glare90)
+
+model.table.oct.allsgt.inter <- summarize_ds_models(
+  dp0.8.hn.obs..sw,
+  dp0.8.hn.obs..bfc,
+  dp0.8.hn.sw..bfc ,
+dp0.8.hn.sw..g90c,
+dp0.8.hn.sw.g90c,
+dp0.8.hn.sw..g90,
+dp0.8.hn.sw.g90,
+    output="plain") 
+rn <- row.names(model.table.oct.allsgt.inter)
+model.table.oct.allsgt.inter <- model.table.oct.allsgt.inter %>% arrange(rn) %>% 
+  tibble::as_tibble()  %>% 
+  rename("SE (Avg det)"="se(Average detectability)",
+         "Avg det"="Average detectability",
+         "CvM"="C-vM $p$-value",
+         "dAIC" = "Delta AIC") %>% 
+  dplyr::select(-Model)
+
+tab.ft0.8 <-  model.table.oct.allsgt.inter$`Key function`[which(nchar(model.table.oct.allsgt.inter$`Key function`) >11)]
+model.table.oct.allsgt.inter %<>% mutate(`Key function` = case_when(
+    nchar(`Key function`)>12 ~ paste0(substring(`Key function`, 1,11),"*"),
+    nchar(`Key function`) <=12 ~ `Key function`))
+
+cap <- paste(ssp, " Interactive effect of covariates to Oct 2022, all sightings Truncation = 0.8 km")
+m_oct_int <- kableExtra::kable(model.table.oct.allsgt.inter, digits=3, row.names = FALSE, escape=FALSE,
+      caption = cap) %>%
+  kableExtra::footnote(paste0("* ", tab.ft0.8)) %>% 
+  kableExtra::kable_styling(latex_options = "hold_position")
+m_oct_int
+
+plot_df(sp, dp0.8.hn.sw..g90c, showpoints = F, bins =30)
+plot_df(sp, dp0.8.hn.sw.g90c, showpoints = F, bins =30)
+```
+
+\clearpage
+
+## Oct dp Abundance Estimates, all sgt, top models 
+
+Look at abundance using top model, compare against other top models.
+
+```{r abundance-by-model0.8}
+# encounter rate and group size
+er <- dp0.8.hn.sw.g90y$dht$individuals$summary[,c(1,5,6,8,9)]
+names(er) <- c("Season", "n", "ER", "cv.ER", "GS")
+# abundance
+Nhat_t <- dp0.8.hn.sw.g90y$dht$individuals$N[,c(1,2,4,5,6)]
+names(Nhat_t) <- c("Season", "N", "cv.N", "L95", "U95")
+
+dp_ab <- full_join(er, Nhat_t) %>% tibble::as_tibble() %>% 
+  mutate_if(is.numeric, round, digits = 2)
+t_oct_abund_sw_g90y0.8 <- kableExtra::kable(dp_ab, digits=3, row.names = FALSE, escape=FALSE,
+      caption = paste(ssp, " abund to Oct 2022, all sgt, HN + swell + glare to 90 degrees (y/n). Truncation = 0.8 km.")) %>% 
+  kableExtra::kable_styling(latex_options = "hold_position")
+t_oct_abund_sw_g90y0.8
+
+#----------------------------------------------------------------
+er <- dp0.8.hn.sw..g90y$dht$individuals$summary[,c(1,5,6,8,9)]
+names(er) <- c("Season", "n", "ER", "cv.ER", "GS")
+# abundance
+Nhat_t <- dp0.8.hn.sw..g90y$dht$individuals$N[,c(1,2,4,5,6)]
+names(Nhat_t) <- c("Season", "N", "cv.N", "L95", "U95")
+
+dp_ab <- full_join(er, Nhat_t) %>% tibble::as_tibble() %>% 
+  mutate_if(is.numeric, round, digits = 2)
+t_oct_abund_sw__g90y0.8 <- kableExtra::kable(dp_ab, digits=3, row.names = FALSE, escape=FALSE,
+      caption = paste(ssp, " abund to Oct 2022, all sgt, HN + interaction (swell * glare to 90 degrees (y/n)). Truncation = 0.8 km.")) %>% 
+  kableExtra::kable_styling(latex_options = "hold_position")
+t_oct_abund_sw__g90y0.8
+
+#----------------------------------------------------------------
+er <- dp0.8.hn.sw$dht$individuals$summary[,c(1,5,6,8,9)]
+names(er) <- c("Season", "n", "ER", "cv.ER", "GS")
+# abundance
+Nhat_t <- dp0.8.hn.sw$dht$individuals$N[,c(1,2,4,5,6)]
+names(Nhat_t) <- c("Season", "N", "cv.N", "L95", "U95")
+
+dp_ab_bfc <- full_join(er, Nhat_t) %>% tibble::as_tibble() %>% 
+  mutate_if(is.numeric, round, digits = 2)
+
+t_oct_abund_sw0.8 <- kableExtra::kable(dp_ab_bfc, digits=3, row.names = FALSE, escape=FALSE,
+      caption = paste(ssp," Abund to Oct 2022, all sgt, HN + swell. Truncation = 0.8 km.")) %>% 
+  kableExtra::kable_styling(latex_options = "hold_position")
+t_oct_abund_sw0.8
+```
+
+\clearpage
+## Oct 2022 - reticle sightings only
+Dall's porpoise sightings to October 2022 N = `r nrow(dp_ret)`. Just to examine effect
+of taking out eyeballed sightings since they estimate radial distance using a 
+different method.
+
+```{r oct-ret}
+#-----------------------------------------------------------------
+#------------- OCT 2022 reticle sgt only (366) -------------------
+#-----------------------------------------------------------------
+obs_ret <- full_join(dp_ret, effort_oct) #%>% #left_join(reg) %>%
+
+dp0.8.un.ret         <-ds(obs_ret, key = "un", truncation = 0.8)   
+dp0.8.hn.ret         <-ds(obs_ret, key = "hn", truncation = 0.8)   
+dp0.8.hn.sw.ret      <-ds(obs_ret, 0.8, key="hn", formula=~swell)         
+dp0.8.hn.g90y.ret    <-ds(obs_ret, 0.8, key="hn", formula=~Glare90y)             
+dp0.8.hn.sw.g90y.ret <-ds(obs_ret, 0.8, key="hn", formula=~swell+Glare90y)              
+
+model.table.oct.ret <- summarize_ds_models(
+  dp0.8.un.ret        ,
+  dp0.8.hn.ret        ,
+  dp0.8.hn.sw.ret     ,
+  dp0.8.hn.g90y.ret   ,
+  dp0.8.hn.sw.g90y.ret,
+  output="plain")%>% 
+  tibble::as_tibble()  %>% 
+  rename("SE (Avg det)"="se(Average detectability)",
+         "Avg det"="Average detectability",
+         "CvM"="C-vM $p$-value",
+         "dAIC" = "Delta AIC") %>% 
+  dplyr::select(-Model)
+
+tab.ft0.8 <-  model.table.oct.ret$`Key function`[which(nchar(model.table.oct.ret$`Key function`) >11)]
+
+model.table.oct.ret %<>% mutate(`Key function` = case_when(
+    nchar(`Key function`)>12 ~ paste0(substring(`Key function`, 1,11),"*"),
+    nchar(`Key function`) <=12 ~ `Key function`))
+
+m_oct_ret <- kableExtra::kable(model.table.oct.ret, digits=3, row.names = FALSE, escape=FALSE,
+      caption = paste(sp, " Comparison of models to Oct 2022, ret only. Truncation = 0.8 km.")) %>%
+  kableExtra::footnote(paste0("* ", tab.ft0.8)) %>% 
+  kableExtra::kable_styling(latex_options = "hold_position")
+m_oct_ret
+
+#------------------------------------------
+# encounter rate and group size
+er <- dp0.8.hn.sw.ret$dht$individuals$summary[,c(1,5,6,8,9)]
+names(er) <- c("Season", "n", "ER", "cv.ER", "GS")
+# abundance
+Nhat_t <- dp0.8.hn.sw.ret$dht$individuals$N[,c(1,2,4,5,6)]
+names(Nhat_t) <- c("Season", "N", "cv.N", "L95", "U95")
+
+dp_ab_ret <- full_join(er, Nhat_t) %>% tibble::as_tibble() %>% 
+  mutate_if(is.numeric, round, digits = 2)
+
+t_oct_abund_sw0.8ret <- kableExtra::kable(dp_ab_ret, digits=3, row.names = FALSE, escape=FALSE,
+      caption = paste(ssp, " Abund to Oct 2022, ret, HN + swell. Trunc = 0.8 km.")) %>% 
+  kableExtra::kable_styling(latex_options = "hold_position")
+t_oct_abund_sw0.8ret
+
+```
+
+\clearpage
+
+# Oct dp models - effects of different truncation distance 
+
+## Compare models with truncation at 0.75 and 0.85 km
+
+```{r oct-trunc}
+dp0.75.un         <-ds(obs, key = "un", truncation = 0.75)   
+dp0.75.hn         <-ds(obs, key = "hn", truncation = 0.75)   
+dp0.75.hn.sw      <-ds(obs, key = "hn", truncation = 0.75, formula=~swell)         
+dp0.75.hn.sw..g90y<-ds(obs, key = "hn", truncation = 0.75, formula=~swell * Glare90y)             
+dp0.75.hn.sw.g90y <-ds(obs, key = "hn", truncation = 0.75, formula=~swell + Glare90y)  
+
+model.table.oct.allsgt0.75 <- summarize_ds_models(
+  dp0.75.un ,
+  dp0.75.hn,
+  dp0.75.hn.sw.g90y,
+  dp0.75.hn.sw..g90y,
+  dp0.75.hn.sw,
+  output="plain") %>% 
+  tibble::as_tibble()  %>% 
+  rename("SE (Avg det)"="se(Average detectability)",
+         "Avg det"="Average detectability",
+         "CvM"="C-vM $p$-value",
+         "dAIC" = "Delta AIC") %>% 
+  dplyr::select(-Model)
+
+tab.ft0.75 <-  model.table.oct.allsgt0.75$`Key function`[which(nchar(model.table.oct.allsgt0.75$`Key function`) >11)]
+
+model.table.oct.allsgt0.75 %<>% mutate(`Key function` = case_when(
+    nchar(`Key function`)>12 ~ paste0(substring(`Key function`, 1,11),"*"),
+    nchar(`Key function`) <=12 ~ `Key function`))
+
+
+cap <- paste(ssp, " Comparison of models to October 2022, all sightings Truncation = 0.75 km. N = ", nrow(dp0.75))
+m_oct_all0.75 <- kableExtra::kable(model.table.oct.allsgt0.75, digits=3, row.names = FALSE, escape=FALSE,
+      caption = cap) %>%
+  kableExtra::footnote(paste0("* ", tab.ft0.75)) %>% 
+  kableExtra::kable_styling(latex_options = "hold_position")
+m_oct_all0.75
+#----------------------------------
+model.table.oct.allsgt0.8 <- summarize_ds_models(
+  dp0.8.un         ,
+  dp0.8.hn         ,
+  dp0.8.hn.sw      ,
+  dp0.8.hn.sw..g90y,
+  dp0.8.hn.sw.g90y ,
+  output="plain") %>% 
+  tibble::as_tibble()  %>% 
+  rename("SE (Avg det)"="se(Average detectability)",
+         "Avg det"="Average detectability",
+         "CvM"="C-vM $p$-value",
+         "dAIC" = "Delta AIC") %>% 
+  dplyr::select(-Model)
+
+tab.ft0.8 <-  model.table.oct.allsgt0.8$`Key function`[which(nchar(model.table.oct.allsgt0.8$`Key function`) >11)]
+
+model.table.oct.allsgt0.8 %<>% mutate(`Key function` = case_when(
+    nchar(`Key function`)>12 ~ paste0(substring(`Key function`, 1,11),"*"),
+    nchar(`Key function`) <=12 ~ `Key function`))
+
+cap <- paste(ssp, " Comparison of models to October 2022, all sightings Truncation = 0.8 km. N = ", nrow(dp0.8))
+m_oct_all0.8 <- kableExtra::kable(model.table.oct.allsgt0.8, digits=3, row.names = FALSE, escape=FALSE,
+      caption = cap) %>%
+  kableExtra::footnote(paste0("* ", tab.ft0.8)) %>% 
+  kableExtra::kable_styling(latex_options = "hold_position")
+m_oct_all0.8
+#----------------------------------
+dp0.85.un         <-ds(obs, key = "un", truncation = 0.85)   
+dp0.85.hn         <-ds(obs, key = "hn", truncation = 0.85)   
+dp0.85.hn.sw      <-ds(obs, key = "hn", truncation = 0.85, formula=~swell)         
+dp0.85.hn.sw..g90y<-ds(obs, key = "hn", truncation = 0.85, formula=~swell * Glare90y)             
+dp0.85.hn.sw.g90y <-ds(obs, key = "hn", truncation = 0.85, formula=~swell + Glare90y)  
+
+model.table.oct.allsgt0.85 <- summarize_ds_models(
+  dp0.85.un         ,
+  dp0.85.hn         ,
+  dp0.85.hn.sw      ,
+  dp0.85.hn.sw..g90y,
+  dp0.85.hn.sw.g90y ,
+  output="plain") %>% 
+  tibble::as_tibble()  %>% 
+  rename("SE (Avg det)"="se(Average detectability)",
+         "Avg det"="Average detectability",
+         "CvM"="C-vM $p$-value",
+         "dAIC" = "Delta AIC") %>% 
+  dplyr::select(-Model)
+
+tab.ft0.85 <-  model.table.oct.allsgt0.85$`Key function`[which(nchar(model.table.oct.allsgt0.85$`Key function`) >11)]
+
+model.table.oct.allsgt0.85 %<>% mutate(`Key function` = case_when(
+    nchar(`Key function`)>12 ~ paste0(substring(`Key function`, 1,11),"*"),
+    nchar(`Key function`) <=12 ~ `Key function`))
+
+cap <- paste(ssp, " Comparison of models to October 2022, all sightings Truncation = 0.85 km. N = ", nrow(dp0.85))
+m_oct_all0.85 <- kableExtra::kable(model.table.oct.allsgt0.85, digits=3, row.names = FALSE, escape=FALSE,
+      caption = cap) %>%
+  kableExtra::footnote(paste0("* ", tab.ft0.85)) %>% 
+  kableExtra::kable_styling(latex_options = "hold_position")
+m_oct_all0.85
+
+```
+
+\clearpage
+
+## Abundance Estimates, all sgt, compare at truncation distance 0.75 and 0.85 km
+
+```{r abundance-by-truncation}
+# # encounter rate and group size
+# er <- dp0.85.hn.bfc.ob$dht$individuals$summary[,c(1,5,6,8,9)]
+# names(er) <- c("Season", "n", "ER", "cv.ER", "GS")
+# # abundance
+# Nhat_t <- dp0.85.hn.bfc.ob$dht$individuals$N[,c(1,2,4,5,6)]
+# names(Nhat_t) <- c("Season", "N", "cv.N", "L95", "U95")
+# 
+# dp_ab <- full_join(er, Nhat_t) %>% tibble::as_tibble() %>% 
+#   mutate_if(is.numeric, round, digits = 2)
+# t_oct_abund_bfc_ob0.85 <- kableExtra::kable(dp_ab, digits=3, row.names = FALSE, escape=FALSE,
+#       caption = paste(ssp, " abund to Oct 2022, all sgt, HN + clumped beaufort + observer. Truncation = 0.85 km.")) %>% 
+#   kableExtra::kable_styling(latex_options = "hold_position")
+# t_oct_abund_bfc_ob0.85
+# 
+# #----------------------------------------------------------------
+# er <- dp0.85.hn.bfc$dht$individuals$summary[,c(1,5,6,8,9)]
+# names(er) <- c("Season", "n", "ER", "cv.ER", "GS")
+# # abundance
+# Nhat_t <- dp0.85.hn.bfc$dht$individuals$N[,c(1,2,4,5,6)]
+# names(Nhat_t) <- c("Season", "N", "cv.N", "L95", "U95")
+# 
+# dp_ab_bfc <- full_join(er, Nhat_t) %>% tibble::as_tibble() %>% 
+#   mutate_if(is.numeric, round, digits = 2)
+# 
+# t_oct_abund_bfc0.85 <- kableExtra::kable(dp_ab_bfc, digits=3, row.names = FALSE, escape=FALSE,
+#       caption = paste(ssp," Abund to Oct 2022, all sgt, HN + clumped beaufort. Trunccation = 0.85 km.")) %>% 
+#   kableExtra::kable_styling(latex_options = "hold_position")
+# t_oct_abund_bfc0.85
+#----------------------------------------------------------------
+# encounter rate and group size
+er <- dp0.75.hn.sw..g90y$dht$individuals$summary[,c(1,5,6,8,9)]
+names(er) <- c("Season", "n", "ER", "cv.ER", "GS")
+# abundance
+Nhat_t <- dp0.75.hn.sw..g90y$dht$individuals$N[,c(1,2,4,5,6)]
+names(Nhat_t) <- c("Season", "N", "cv.N", "L95", "U95")
+
+dp_ab <- full_join(er, Nhat_t) %>% tibble::as_tibble() %>% 
+  mutate_if(is.numeric, round, digits = 2)
+t_oct_abund_sw__g90y0.75 <- kableExtra::kable(dp_ab, digits=3, row.names = FALSE, escape=FALSE,
+      caption = paste(ssp, " abund to Oct 2022, all sgt, HN + interaction (swell * glare to 90 degrees (y/n)). Truncation = 0.75 km.")) %>% 
+  kableExtra::kable_styling(latex_options = "hold_position")
+t_oct_abund_sw__g90y0.75
+#----------------------------------------------------------------
+t_oct_abund_sw__g90y0.8
+#----------------------------------------------------------------
+er <- dp0.85.hn.sw..g90y$dht$individuals$summary[,c(1,5,6,8,9)]
+names(er) <- c("Season", "n", "ER", "cv.ER", "GS")
+# abundance
+Nhat_t <- dp0.85.hn.sw..g90y$dht$individuals$N[,c(1,2,4,5,6)]
+names(Nhat_t) <- c("Season", "N", "cv.N", "L95", "U95")
+
+dp_ab <- full_join(er, Nhat_t) %>% tibble::as_tibble() %>% 
+  mutate_if(is.numeric, round, digits = 2)
+t_oct_abund_sw__g90y0.85 <- kableExtra::kable(dp_ab, digits=3, row.names = FALSE, escape=FALSE,
+      caption = paste(ssp, " abund to Oct 2022, all sgt, HN + interaction (swell * glare to 90 degrees (y/n)). Truncation = 0.85 km.")) %>% 
+  kableExtra::kable_styling(latex_options = "hold_position")
+t_oct_abund_sw__g90y0.85
+
+```
+
+\clearpage
+
+# COMPARISONS
+
+```{r comp}
+m_feb_all0.9
+m_feb_all0.8
+
+m_oct_all0.75
+m_oct_all0.8
+m_oct_all0.85
+
+t_feb_all_abund_sw_g90y0.9
+t_feb_all_abund_sw_g90y0.8
+
+t_oct_abund_sw__g90y0.75
+t_oct_abund_sw__g90y0.8
+t_oct_abund_sw__g90y0.85
+
+t_oct_abund_sw_g90y0.8
+
+```
+
+\clearpage
+
+# MONTHLY abundance estimates
+
+Using half normal model with interaction terms swell and glare to 90 (y/n) as covariates. NOT enough data yet... (as of Oct 2022 data)
+
+```{r by_month}
+# temp - test fitting by month as region instead of season
+dp2 <- dp %>% mutate(Region.Label=month_abb)
+# dp2[which(dp2$Sample.Label=="cemore_2020sep5" & dp2$Region.Label=="Aug"),]$Region.Label <- "Sep" (from hw)
+# dp2[which(lubridate::year(dp2$date) ==2020 & lubridate::month(dp2$date)==8),]$Region.Label <- "Sep"
+effort_oct <- effort_oct %>% mutate(Region.Label=month_abb)
+obs2 <- full_join(dp2, effort_oct_monthly)
+
+dp0.8.hn.sw..g90y <- ds(obs2, 0.8, key="hn", formula=~swell * Glare90y)
+
+er <- dp0.8.hn.sw..g90y$dht$individuals$summary[c(1:12),c(1,5,6,8,9)]
+names(er) <- c("Month", "n", "ER", "cv.ER", "GS")
+# abundance
+Nhat_t <- dp0.8.hn.sw..g90y$dht$individuals$N[c(1:12),c(1,2,4,5,6)]
+names(Nhat_t) <- c("Month", "N", "cv.N", "L95", "U95")
+
+dp_ab_monthly <- full_join(er, Nhat_t) %>% tibble::as_tibble() %>%
+  mutate_if(is.numeric, round, digits = 2)
+
+kableExtra::kable(dp_ab_monthly, digits=3, row.names = FALSE, escape=FALSE,
+      caption = paste(ssp," Abund *monthly* to Oct 2022, all sgt, HN + clumped Beaufort + Observer, Trunc = 0.8 km.")) %>%
+  kableExtra::kable_styling(latex_options = "hold_position")
+
+```
