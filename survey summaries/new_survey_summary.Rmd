@@ -1,0 +1,293 @@
+---
+title: "CeMoRe Survey Summary Rollup"
+author: 
+date: 
+output: 
+  word_document: 
+    fig_caption: yes
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      collapse = TRUE,
+                      warning = FALSE,
+                      message = FALSE)
+knitr::opts_chunk$set(fig.width=18)
+
+source("../../R/0 Setup.R")
+
+knitr::knit_hooks$set(inline=
+                        function(x){
+                          if(!is.numeric(x)){x
+                          }else{prettyNum(round(x,2),
+                                         big.mark=",")}})
+knitr::knit_hooks$set(inline=
+                        function(x){
+                          if(!is.numeric(x)){x
+                          }else{ifelse(x<10,as.character(english::as.english(x)),x)}})
+
+```
+
+```{r load_data, include = F}
+effort <- load_effort(year, month, single=T)
+effort_lines <- get_effort_lines(effort)
+ap_sf <- load_sightings(year, month, single=T)
+
+# all_effort <- load_effort(year, month, single=F, vessel = "MB")
+# all_effort_lines <- readRDS(paste0("../output/all_lines/all_effort_lines_to_", year,"_", month, ".rds")) %>%
+#   mutate(length_km = as.numeric(st_length(geometry))/1000)
+# all_ap_sf <- readRDS(paste0("../output/all_sgt/all_effort_sgt_to_", year,"_",month, ".rds"))
+
+
+summary <- survey_summary()
+s <- summary[[1]]
+sp <- summary[[2]]
+dates <- summary[[4]]
+eff <- inner_join(dates, summary[[3]]) %>% 
+  dplyr::select(c("Vessel" = Vessel_code, #"Start" = Date_Start_GMT, "End"=Date_End_GMT,
+                  "Field days"=field_days,"Survey days"=days,"Transects"=transects,"Km surveyed"=distance_km)) %>% as.data.frame() %>% mutate("Acoustic moorings deployed/retrieved"="2/1", "HW tags deployed"="3")
+# summary_all <- survey_summary(single=F)
+
+survey <- paste(month.name[dates[1,]$start_month], year)
+firstday <- dates$firstday
+lastday <- dates$lastday
+```
+# `r survey`
+This report provides a summary of the Cetacean Research Program’s field efforts to meet commitments under TMX Recommendations 5/6 `r firstday` to `r lastday`, `r year`.
+
+## Field program overview
+In order to meet DFO’s commitments under TMX Recommendations 5 and 6, the Cetacean Research Program assembled a dedicated team for Cetacean Monitoring and Research (CeMoRe) in the southern Salish Sea in 2020, with efforts now expanding to the central coast of BC in collaboration with ESD’s Coastal Environmental Baseline program. Fieldwork is focused on better understanding the abundance, distribution, and behaviour of cetaceans in the TMX project area and the central coast. Field objectives include line-transect surveys, deployment of acoustic recorders, deployment of data-logging tags on humpback whales, and collection of genetic and photo-identification data from humpback whales. 
+
+Line-transect surveys were conducted monthly (weather permitting) from July 2020 to February 2023 in the TMX project area from Vancouver to Swiftsure Bank, and are now being conducted in that area every second month and on the central coast three times per year. These surveys are required to describe the seasonal distribution and estimate the abundance of cetaceans, and to address identified data gaps with respect to vessel strike risk for these species.
+
+Acoustic recorders are being deployed to record the high-frequency clicks produced by porpoises. The acoustic data supplement boat-based surveys by providing insight into habitat use of porpoises that cannot be gained from visual surveys (i.e. how use of various water depths and habitat types may vary throughout day and night) and implications for vessel-related impacts on these species. Acoustic recorders are deployed systematically throughout the project area and data are downloaded from each recorder at least once every three months. 
+
+Collaborative humpback whale tagging efforts are being conducted with researchers from Cascadia Research Collective (CRC) and Stanford University. Data from these tags provide insight into humpback whale dive behaviour in and around shipping lanes and how this behaviour influences their vulnerability to vessel strikes, including during nighttime hours and weather conditions in which visual surveys are not possible. 
+
+Photo-identification and genetic data from humpback whales are being collected to inform population structure and movements of humpback whales in Canadian Pacific waters, and therefore the proportion of the North Pacific humpback whale population that is impacted by vessel strike risk in the project area. 
+
+<!-- During the recent field effort, the team was able to deploy tags on whales in the inside waters of Juan de Fuca, as well as in the more open waters on and around Swiftsure Bank (Figure 3). Data collected from these tags can therefore contribute to regional comparison of humpback whale movements and dive behaviour within the overall project area.   -->
+### `r survey` field work summary
+Field work focused on `r surveys[which(surveys$year == year & surveys$month_abb == month_abb),]$objectives %>% tolower()`. The survey included `r length(unique(effort$TransectID))` transects (`r round(sum(st_length(effort_lines))/1000,0) %>% units::set_units(NULL)` km) over `r length(unique(day(effort$GpsT)))` days of `r dates$field_days` total field days (Figure 1, Table 1). 
+
+The completed transect lines resulted in `r nrow(ap_sf)` sightings of `r sum(ap_sf$Group_Size)` individual cetaceans (Table 2, Figure 1). This was comprised of `r ap_sf %>% filter(Species %like% "hump") %>% nrow()` sightings of humpback whales (`r sum(ap_sf[which(ap_sf$Species %like% "hump"),]$Group_Size)` individuals), `r ap_sf %>% filter(Species %like% "harbour") %>% nrow()` sightings of harbour porpoise (`r sum(ap_sf[which(ap_sf$Species %like% "harbour"),]$Group_Size)` individuals), `r ap_sf %>% filter(Species %like% "Dall") %>% nrow()` sightings of Dall’s porpoise (`r sum(ap_sf[which(ap_sf$Species %like% "Dall"),]$Group_Size)` individuals), and `r ap_sf %>% filter(Species %like% "kill") %>% nrow()` sighting of killer whales of unknown ecotype (`r sum(ap_sf[which(ap_sf$Species %like% "kill"),]$Group_Size)` individuals).
+
+Two acoustic recorders were deployed, one near Roberts Bank and one in eastern Juan de Fuca Strait, and one previously deployed recorder was recovered (Figure 1). Three suction cup tags were deployed on humpback whales in Juan de Fuca Strait and were retrieved. 
+
+```{r effort-tbl} 
+eff_tbl_cp <- paste0("Field effort summary for ", survey)
+
+csasdown::csas_table(eff,longtable = F,  escape = FALSE, font_size=9,  align=c("c","c","c","c","c","c","c"), caption =eff_tbl_cp)
+```
+
+
+```{r sgt-tbl} 
+sgt_tbl <- sp %>% as.data.frame() %>%  
+  # dplyr::select(-c(SurveyID, seasonYear, season)) %>% 
+  rename("Number of sightings" = number_sightings, "Total number of individuals" = number_individuals)
+
+sgt_tbl_cp <- paste0("Table 2: Species sightings for the CeMoRe ", survey, " survey.")
+
+csasdown::csas_table(sgt_tbl,longtable = F,  escape = FALSE, font_size=9,  align=c("l","r","r"), caption =sgt_tbl_cp)
+```
+
+
+```{r prep-plot,results='hide'}
+survey_map_file <- paste0("C:/Users/keppele/Documents/CeMoRe/Analysis/cemore_analysis/output_maps/summary_map_", survey_title, ".png")
+
+if(!file.exists(survey_map_file)){
+ 
+  p <-
+    plot_survey(single_survey=T, incidentals=F, hydrophone=T, save=T)
+  knitr::plot_crop(survey_map_file)
+}
+```
+
+```{r survey-plot, fig.cap=paste("\\label{fig:plot}Cetacean line-transect survey effort", firstday, "to", lastday, ", ", year, "including all on-effort sightings. Acoustic recorder deployment and retrieval locations are show as asterisks.")}
+#  Acoustic recorder deployment locations are shown as asterisks.
+knitr::include_graphics(paste0("C:/Users/keppele/Documents/CeMoRe/Analysis/cemore_analysis/output_maps/summary_map_",survey_title,".png"))
+```
+
+*The CeMoRe team’s next field effort is planned for October 1-20, 2023, on the Central Coast aboard the chartered Arctic Research Foundation vessel Tiriarnaq including a line-transect survey and accompanying photo-identification, genetic sampling and tagging of humpback whales aboard CRP's Titan RHIB.*
+
+ *Note: There has been a recent (since May 2023) issue receiving fuel and moorage in Port Renfrew, restricting how far west in the initial study area field work can be conducted.*
+ 
+\newpage
+
+# All surveys September 2020 to `r paste0(month.name[as.numeric(month)], " ", year)`
+
+## Survey Effort (September 2020 to `r survey`)
+Transect line surveys aboard MV Manyberries in Southern Salish Sea/Swiftsure Bank only. Additional surveys have been conducted in the primary survey area aboard CCGS Vector (not shown here) and on the north coast of BC since January 2023 (not shown here).
+
+```{r load-data}
+# Load previously saved data
+# all_effort <- load_effort(year, as.numeric(month), single_survey = F, vessel = "MB") 
+# saveRDS(all_effort, "output_cemore/all_effort/all_effort_to_2022_10.rds")
+all_effort <- readRDS(paste0("C:/users/keppele/documents/cemore/analysis/cemore_analysis/output_cemore/all_effort/all_effort_to_",year,"_",month, ".rds"))
+all_effort_lines <- readRDS(paste0("C:/users/keppele/documents/cemore/analysis/cemore_analysis/output_cemore/all_lines/all_effort_lines_to_",year,"_",month, ".rds")) #%>% 
+  # mutate(length_km = as.numeric(st_length(geometry))/1000) %>% 
+  # filter(length_km>0)
+# or all_effort_lines %<>% mutate(npts=npts(geometry,by_feature=T)) %>% filter(npts>1)
+# all_effort_lines <- get_effort_lines(all_effort)
+# saveRDS(all_effort_lines, "output_cemore/all_lines/all_effort_lines_to_2022_12.rds")
+# saveRDS(all_effort_lines, paste0("C:/users/keppele/documents/cemore/analysis/cemore_analysis/output_cemore/all_lines/all_effort_lines_to_",year,"_",month, ".rds"))
+# all_ap_sf <- load_sightings(year, as.numeric(month), single_survey = F, vessel="MB") 
+# saveRDS(all_ap_sf, "output_cemore/all_sgt/all_effort_sgt_to_2022_10.rds")
+all_ap_sf <- readRDS(paste0("C:/users/keppele/documents/cemore/analysis/cemore_analysis/output_cemore/all_sgt/all_effort_sgt_to_",year,"_",month,".rds"))
+all_ap_sf <- all_ap_sf %>%  filter(Vessel=="MB") %>% 
+  # readRDS(paste0("output_cemore/all_sgt/all_effort_sgt_to_",year,"_"< , ".rds")) %>%
+  rename(Glare90=glare) %>%
+  dplyr::mutate(Beaufort = as.numeric(as.character(Beaufort)),
+                Clumped_Beaufort = case_when(
+                  Beaufort <2 ~ "0-1",
+                  Beaufort == 2 ~ "2",
+                  Beaufort > 2 ~ "3+"),
+                Clumped_Group_Size2 = factor(
+                  dplyr::case_when(
+                    Group_Size==1 ~ "1",
+                    Group_Size==2 ~ "2",
+                    Group_Size==3 ~ "3",
+                    Group_Size>3 ~ "4+"
+                  ), levels=  c("1","2","3","4+")),
+                Clumped_Group_Size = factor(
+                  dplyr::case_when(
+                    Group_Size==1 ~ "1",
+                    Group_Size==2 ~ "2",
+                    Group_Size>2 ~ "3+"
+                  ), levels=  c("1","2","3+")),
+                swell=factor(case_when(
+                  swell %in% c("Big >2", "Moderate 1-2 m") ~ "Mod-Big",
+                  swell == "Low <1 m" ~ "Low",
+                  swell == "No swell" ~ "No swell"),
+                  levels= c("No swell", "Low", "Mod-Big")),
+                Clumped_Swell=factor(case_when(
+                  swell %in% c("Mod-Big", "Low") ~ "Swell",
+                  swell == "No swell" ~ "No swell"),
+                  levels= c("No swell","Swell")),
+                Clumped_Swell2=factor(case_when(
+                  swell == "Mod-Big" ~ "Mod-Big",
+                  swell %in% c("Low", "No swell") ~ "Low-no swell"),
+                  levels= c("Low-no swell","Mod-Big")),
+                # Visibility=case_when(   # this is now incorporated into get_effort_lines and get_sightings
+                #   Visibility == "F" ~ "M",
+                #   !Visibility== "F" ~ Visibility
+                # ),
+                Clumped_Visibility = case_when(
+                  Visibility %in% c("G&E", "Moderate") ~ "G/M",
+                  Visibility == "P" ~ "P"),
+                Clumped_Vis2 = case_when(
+                  Visibility == "G&E"~ "G",
+                  Visibility %in% c("Moderate", "P") ~ "M/P"),
+                Observer = case_when(
+                  Observer == "CMcMillan" ~"a",
+                  Observer == "EKeppel"~"b",
+                  Observer == "LSpaven"~ "c"),
+         l_glare = ifelse(Glare90 == "None", NA, l_glare) %>% as.numeric(),
+         r_glare = ifelse(Glare90 == "None", NA, r_glare) %>% as.numeric(),
+         Glare90 = ifelse(Glare90 == "Severe","Severe","None/Mild"),
+         glare_swath = abs(l_glare-r_glare),
+         l_glare45 = case_when(
+           l_glare <= -45 ~ -45,
+           l_glare %in% -45:45 ~ l_glare,
+           l_glare > 45 ~ NA
+         ),
+         r_glare45 = case_when(
+           r_glare >=45 ~ 45,
+           r_glare %in% -45:45 ~ r_glare,
+           r_glare < -45 ~ NA
+         ),
+         glare_swath45=case_when(
+           l_glare45 %in% -45:45 & r_glare45 %in% -45:45 & !l_glare45==r_glare45 ~ abs(l_glare45-r_glare45)),
+         # Glare90y = ifelse(!Glare90=="None","y","n"),
+         # Glare90 = ifelse(Glare90=="Severe","Severe","Mild/None"),
+         glare_swath = ifelse(Glare90=="Severe", glare_swath, 0),
+         glare_swath45 = ifelse(Glare90=="Severe",glare_swath45, 0)#,
+         # Glare45 = ifelse(l_glare %in% -45:45 | r_glare %in% -45:45, Glare90, "None"),
+         # Glare45y = ifelse(Glare45=="None","n","y"),
+         # Glare45 = ifelse(Glare45=="Severe","Severe","Mild/None")
+         ) %>% 
+  mutate(
+    seasonYear = factor(seasonYear, levels = unique(seasonYear)),
+    # Region.Label= Survey,
+    Region.Label= season,
+    # Region.Label= seasonYear,
+    Sample.Label=TransectID,
+    object=Sgt_ID)
+
+#------------------------------------------------
+# create new tid's so they are ordered geographically NE to SW for alternate er_var mehtods
+# (ie. increasing distance from a point near Vancouver N of transects)
+#------------------------------------------------
+
+
+all_ap_sf %<>%   mutate(Sample.Label=TransectID) #update Sample.Label w new tids
+#------------------------------------------------
+summary_all <- survey_summary(single=F)
+
+sum_eff <- summary_all[[3]] %>% 
+  as.data.frame() %>% 
+  mutate(month_name=month.name[month])
+```
+
+Total distance surveyed = `r round(sum(st_length(all_effort_lines))/1000) %>% as.numeric()` km.
+
+```{r summarise survey distance}
+x <- all_effort_lines %>% mutate(length = st_length(geometry)) %>% st_drop_geometry() %>% filter(!is.na(length))
+
+eff_season <- x %>% 
+  transmute(Season = season, SurveyID = SurveyID, length = as.numeric(length),year) %>%
+  group_by(Season) %>% 
+  summarise("Number of surveys" = length(unique(SurveyID)), 
+            "Number of years" = length(unique(year)),
+            "Years" = str_c((unique(year)), collapse=", "),
+            "Total survey length (km)" = round(sum(length/1000)))
+eff_month <- x %>% 
+  transmute(Season=season, Month= month_abb, SurveyID = SurveyID, length = as.numeric(length), year) %>%
+  group_by(Month, Season) %>%
+  summarise("Number of surveys/years" = length(unique(SurveyID)),
+            "Years" = str_c((unique(year)), collapse=", "),
+            "Total survey length (km)" = round(sum(length/1000)))
+eff_survey <- x  %>% 
+  # transmute(Year = year, Month= month_abb, length = as.numeric(length)) %>%
+  transmute(Year = year, Month=month_abb, month,Season = season, SurveyID = SurveyID, length = as.numeric(length)) %>%
+  # group_by(Year, Month) %>% 
+  group_by(Year, SurveyID, Season) %>% 
+  summarise("Total survey length (km)" = round(sum(length/1000)))
+
+# total number of survey days and total count cetacean sightings; days on effort per survey
+e1 <- all_effort %>% filter(Status == "ON", Vessel=="MB") %>% rename(Season = season) %>% 
+  dplyr::group_by(
+    # Year = year(GpsT),
+    # Month = factor(month.abb[month(GpsT)], levels = month.abb[1:12]),
+    Season) %>% 
+  dplyr::summarise("# days on effort" = n_distinct(day(GpsT)), "# transects" = n_distinct(Final.T.ID))
+
+
+e2 <- all_effort %>% filter(Status == "ON", Vessel=="MB") %>%
+  rename(Season = season,  Month = month_abb) %>% 
+  dplyr::group_by(Month, Season) %>% 
+  dplyr::summarise("# days on effort" = n_distinct(day(GpsT)), "# transects" = n_distinct(Final.T.ID))
+
+e3 <- all_effort %>% filter(Status == "ON", Vessel=="MB") %>% rename(Season = season) %>% 
+  dplyr::group_by(
+    SurveyID,# Year = year(GpsT),
+    Season
+        # Month = factor(month.abb[month(GpsT)], levels = month.abb[1:12])
+    ) %>% 
+  dplyr::summarise("# days on effort" = n_distinct(day(GpsT)), "# transects" = n_distinct(Final.T.ID))
+
+
+e_season <- dplyr::full_join(eff_season, e1) %>% kableExtra::kable()
+e_month <- dplyr::full_join(eff_month, e2) %>% kableExtra::kable()
+e_survey <- dplyr::full_join(eff_survey, e3) %>% kableExtra::kable()
+
+```
+
+```{r effort-tables}
+
+e_season
+e_month
+e_survey
+
+```

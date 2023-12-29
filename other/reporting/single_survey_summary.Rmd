@@ -1,20 +1,21 @@
 ---
 title: "CeMoRe Field Summary"
-author: "EK"
-date: "1/27/2023"
+author: 
+date: 
 output: 
-  word_document: 
+  pdf_document: 
     fig_caption: yes
 ---
+
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE,
                       collapse = TRUE,
                       warning = FALSE,
                       message = FALSE)
-knitr::opts_chunk$set(fig.width=18)
+# knitr::opts_chunk$set(fig.width=ggplot2::unit(18,"cm"))
 
-source("../R/0 Setup.R")
+source("../../R/0 Setup.R")
 
 knitr::knit_hooks$set(inline=
                         function(x){
@@ -28,12 +29,14 @@ knitr::knit_hooks$set(inline=
 
 ```
 
-```{r load_data, include = F}
+```{r load_survey_data, include = F}
 effort <- load_effort(year, month, single=T)
 effort_lines <- get_effort_lines(effort)
 ap_sf <- load_sightings(year, month, single=T)
 
 # all_effort <- load_effort(year, month, single=F, vessel = "MB")
+# all_effort <- readRDS(paste0("../output/all_effort/all_effort_to_", year,"_", month, ".rds")) %>%
+#   mutate(length_km = as.numeric(st_length(geometry))/1000)
 # all_effort_lines <- readRDS(paste0("../output/all_lines/all_effort_lines_to_", year,"_", month, ".rds")) %>%
 #   mutate(length_km = as.numeric(st_length(geometry))/1000)
 # all_ap_sf <- readRDS(paste0("../output/all_sgt/all_effort_sgt_to_", year,"_",month, ".rds"))
@@ -43,6 +46,13 @@ summary <- survey_summary()
 s <- summary[[1]]
 sp <- summary[[2]]
 dates <- summary[[4]]
+eff <- inner_join(dates, summary[[3]]) %>% 
+  dplyr::select(c("Vessel" = Vessel_code, #"Start" = Date_Start_GMT, "End"=Date_End_GMT,
+                  "Field days"=field_days,"Survey days"=days,"Transects"=transects,"Km surveyed"=distance_km),
+                SurveyID) %>%
+  left_join(surveys[which(surveys$SurveyID %like% surveyid),]) %>% 
+    as.data.frame() %>% 
+      dplyr::select(-SurveyID) #%>% mutate("Acoustic moorings deployed/retrieved"="2/1", "HW tags deployed"="3")
 # summary_all <- survey_summary(single=F)
 
 survey <- paste(month.name[dates[1,]$start_month], year)
@@ -53,43 +63,132 @@ lastday <- dates$lastday
 This report provides a summary of the Cetacean Research Program’s field efforts to meet commitments under TMX Recommendations 5/6 `r firstday` to `r lastday`, `r year`.
 
 ## Field program overview
-In order to meet DFO’s commitments under TMX Recommendations 5 and 6, the Cetacean Research Program has assembled a dedicated team for Cetacean Monitoring and Research (CeMoRe) in the southern Salish Sea. Fieldwork is focused on better understanding the abundance, distribution, and behaviour of cetaceans in the TMX project area. Field objectives include line-transect surveys, deployment of acoustic recorders, deployment of data-logging tags on humpback whales, and collection of genetic and photo-identification data from humpback whales. 
+In order to meet DFO’s commitments under TMX Recommendations 5 and 6, the Cetacean Research Program assembled a dedicated team for Cetacean Monitoring and Research (CeMoRe) in the southern Salish Sea in 2020, with efforts now expanding to the central coast of BC in collaboration with ESD’s Coastal Environmental Baseline program. Fieldwork is focused on better understanding the abundance, distribution, and behaviour of cetaceans in the TMX project area and the central coast. Field objectives include line-transect surveys, collection of genetic and photo-identification data from humpback whales, deployment of data-logging tags on humpback whales, and deployment of acoustic recorders. 
 
-Line-transect surveys are being conducted monthly (weather permitting) in the TMX project area from Vancouver to Swiftsure Bank (since July 2020). These surveys are required to describe the seasonal distribution and estimate the abundance of cetaceans, and to address identified data gaps with respect to vessel strike risk for these species.
-
-Acoustic recorders are being deployed to record the high-frequency clicks produced by porpoises. The acoustic data supplements boat-based surveys by providing insight into habitat use of porpoises that cannot be gained from visual surveys (i.e. how use of various water depths and habitat types may vary between day and night) and implications for vessel-related impacts on these species. Acoustic recorders are deployed systematically throughout the project area and data are downloaded from each recorder at least once every three months. 
-
-Collaborative humpback whale tagging efforts are being conducted with researchers from Cascadia Research Collective (CRC) and Stanford University. Data from these tags provide insight into humpback whale dive behaviour in and around shipping lanes and how this behaviour influences their vulnerability to vessel strikes, including during nighttime hours and weather conditions in which visual surveys are not possible. 
+Line-transect surveys were conducted monthly (weather permitting) from July 2020 to February 2023 in the TMX project area from Vancouver to Swiftsure Bank, and have since been conducted in that area approximately every second month (and on the central coast three times per year - central coast data not included here). These surveys are required to describe the seasonal distribution and estimate the abundance of cetaceans, and to address identified data gaps with respect to vessel strike risk for these species.
 
 Photo-identification and genetic data from humpback whales are being collected to inform population structure and movements of humpback whales in Canadian Pacific waters, and therefore the proportion of the North Pacific humpback whale population that is impacted by vessel strike risk in the project area. 
 
-*The CeMoRe team’s next field effort is planned for January 11-25, 2022, aboard the CCG vessel Tanu on the Central Coast including a line-transect survey and photo-identification and genetic sampling of humpback whales.*
+Collaborative humpback whale tagging efforts have been conducted with researchers from Cascadia Research Collective (CRC) and Stanford University and are now being conducted by the CeMoRe team. Data from these tags provide insight into humpback whale dive behaviour in and around shipping lanes and how this behaviour influences their vulnerability to vessel strikes, including during nighttime hours and weather conditions in which visual surveys are not possible. 
+
+Acoustic recorders are being deployed to record the high-frequency clicks produced by porpoises. The acoustic data supplement boat-based visual surveys by providing insight into habitat use of porpoises that cannot be gained from visual surveys (i.e. how use of various water depths and habitat types may vary throughout day and night) and implications for vessel-related impacts on these species. Acoustic recorders are deployed systematically throughout the project area and data are downloaded from each recorder at least once every three months. 
+
+*The CeMoRe team’s next field effort is planned for February 1-15, 2024, on the Central Coast aboard the chartered Arctic Research Foundation vessel Tiriarnaq.*
+
+
+<!-- During the recent field effort, the team was able to deploy tags on whales in the inside waters of Juan de Fuca, as well as in the more open waters on and around Swiftsure Bank (Figure 3). Data collected from these tags can therefore contribute to regional comparison of humpback whale movements and dive behaviour within the overall project area. -->
+
+<!-- Add summary of recorders deployed and recovered with map, and map of deployed tags -->
 \newpage
 
-<!-- During the recent field effort, the team was able to deploy tags on whales in the inside waters of Juan de Fuca, as well as in the more open waters on and around Swiftsure Bank (Figure 3). Data collected from these tags can therefore contribute to regional comparison of humpback whale movements and dive behaviour within the overall project area.   -->
-### `r survey` field work summary
-Field work focused on `r surveys[which(surveys$year == year & surveys$month_abb == month_abb),]$objectives %>% tolower()`. The survey included `r length(unique(effort$TransectID))` transects (`r round(sum(st_length(effort_lines))/1000,0) %>% units::set_units(NULL)` km) over `r length(unique(day(effort$GpsT)))` days of `r dates$field_days` total field days (Figure 1, Table 1). 
-<!-- *fix this messy sentence* The completed transect lines resulted in `r nrow(ap_sf)` sightings of `r sum(ap_sf$Group_Size)` individual cetaceans (Table 1, Figure 1). This was comprised of `r ap_sf %>% filter(Species %like% "hump") %>% nrow()` sightings of humpback whales (`r sum(ap_sf[which(ap_sf$Species %like% "hump"),]$Group_Size)` individuals), `r ap_sf %>% filter(Species %like% "harbour") %>% nrow()` sightings of harbour porpoise (`r sum(ap_sf[which(ap_sf$Species %like% "harbour"),]$Group_Size)` individuals), `r ap_sf %>% filter(Species %like% "Dall") %>% nrow()` sightings of Dall’s porpoise (`r sum(ap_sf[which(ap_sf$Species %like% "Dall"),]$Group_Size)` individuals), and `r ap_sf %>% filter(Species %like% "kill") %>% nrow()` sighting of killer whales of unknown ecotype (`r sum(ap_sf[which(ap_sf$Species %like% "kill"),]$Group_Size)` individuals).  -->
+## `r survey` field work summary
+<!-- Field work focused on `r surveys[which(surveys$year == year & surveys$month_abb == month_abb),]$objectives %>% tolower()`. The survey included `r length(unique(effort$TransectID))` transects (`r round(sum(st_length(effort_lines))/1000,0) %>% units::set_units(NULL)` km) over `r length(unique(day(effort$GpsT)))` days of `r dates$field_days` total field days (Figure 1).  -->
+
+<!-- The completed transect lines resulted in `r nrow(ap_sf)` sightings of `r sum(ap_sf$Group_Size)` individual cetaceans (Table 2, Figure 1). This was comprised of `r ap_sf %>% filter(Species %like% "hump") %>% nrow()` sightings of humpback whales (`r sum(ap_sf[which(ap_sf$Species %like% "hump"),]$Group_Size)` individuals), `r ap_sf %>% filter(Species %like% "harbour") %>% nrow()` sightings of harbour porpoise (`r sum(ap_sf[which(ap_sf$Species %like% "harbour"),]$Group_Size)` individuals), `r ap_sf %>% filter(Species %like% "Dall") %>% nrow()` sightings of Dall’s porpoise (`r sum(ap_sf[which(ap_sf$Species %like% "Dall"),]$Group_Size)` individuals), and `r ap_sf %>% filter(Species %like% "kill") %>% nrow()` sighting of killer whales of unknown ecotype (`r sum(ap_sf[which(ap_sf$Species %like% "kill"),]$Group_Size)` individuals). -->
+
+<!-- Two acoustic recorders were deployed, one near Roberts Bank and one in eastern Juan de Fuca Strait, and one previously deployed recorder was recovered (Figure 1). Three suction cup tags were deployed on humpback whales in Juan de Fuca Strait and were retrieved.  -->
+
+```{r effort-tbl}
+eff_tbl_cp <- paste0("Table 1: Field effort summary for ", survey)
+
+csasdown::csas_table(eff,longtable = F,  escape = FALSE, font_size=9,  align=c("c","c","c","c","c","c","c"), caption =eff_tbl_cp)
+```
+
 
 ```{r sgt-tbl} 
-sgt_tbl <- sp %>% as.data.frame() %>%  dplyr::select(-SurveyID) %>% rename("Number of sightings" = number_sightings, "Total number of individuals" = number_individuals)
+sgt_tbl <- sp %>% as.data.frame() %>%  
+  # dplyr::select(-c(SurveyID, seasonYear, season)) %>% 
+  rename("Number of sightings" = number_sightings, "Total number of individuals" = number_individuals)
 
-sgt_tbl_cp <- "Table 1: Species sightings for the CeMoRe July 2022 survey."
+sgt_tbl_cp <- paste0("Species sightings for the CeMoRe ", survey, " survey.")
 
 csasdown::csas_table(sgt_tbl,longtable = F,  escape = FALSE, font_size=9,  align=c("l","r","r"), caption =sgt_tbl_cp)
 ```
+
 
 ```{r prep-plot,results='hide'}
 survey_map_file <- paste0("C:/Users/keppele/Documents/CeMoRe/Analysis/cemore_analysis/output_maps/summary_map_", survey_title, ".png")
 
 if(!file.exists(survey_map_file)){
-  p <- plot_survey(single_survey=T,Save=T, incidentals=F, hydrophone=F)
-  knitr::plot_crop(survey_map_file)
+     plot_survey(single_survey=T, save=T) 
+  knitr::plot_crop(survey_map_file, quiet = T)
+  
+  cap <- paste0("Cetacean line-transect survey effort & sightings, ", survey,".")
 }
 ```
 
-```{r survey-plot, fig.cap=paste("\\label{fig:plot}Figure 1. Cetacean line-transect survey effort", firstday, "to", lastday, year, "including all on-effort and incidental sightings.")}
+```{r survey-plot, fig.cap=cap}
 #  Acoustic recorder deployment locations are shown as asterisks.
 knitr::include_graphics(paste0("C:/Users/keppele/Documents/CeMoRe/Analysis/cemore_analysis/output_maps/summary_map_",survey_title,".png"))
 ```
-<!-- In addition to the survey, one acoustic recorder was deployed in eastern Juan de Fuca Strait near Whirl Bay, and two previously deployed recorders were recovered. -->
+
+ <!-- including a line-transect survey and accompanying photo-identification, genetic sampling and tagging of humpback whales aboard CRP's Titan RHIB -->
+
+<!--  *Note: There has been a recent (since May 2023) issue receiving fuel and moorage in Port Renfrew, restricting how far west in the initial study area field work can be conducted.* -->
+ 
+
+\newpage
+
+# Individual monthly survey summary
+
+```{r prep-indiv-surveys, fig.width=20}
+sids <- unique(all_effort_lines$SurveyID)
+  # dir <- paste0("C:/Users/keppele/Documents/CeMoRe/Analysis/cemore_analysis/output_maps/")
+ 
+eff <- inner_join(summary_all[[4]], summary_all[[3]]) %>% 
+  dplyr::select(c("Vessel" = Vessel_code, SurveyID,#"Start" = Date_Start_GMT, "End"=Date_End_GMT,
+                  "Field days"=field_days,"Survey days"=days,"Transects"=transects,"Km surveyed"=distance_km)) %>% as.data.frame() 
+ 
+ for(i in seq_along(sids)){
+    # survey_map_file <- paste0(dir, "survey_maps/", sids[i], ".png")
+# if(!file.exists(survey_map_file)){
+  x <- all_ap_sf %>% filter(SurveyID == sids[i])
+  z <- all_effort_lines %>% filter(SurveyID == sids[i])
+  m <- unique(substr(x$SurveyID, 12, 14)) %>% first_up()
+  y <- unique(x$year)
+  plot_survey(sgt_data=x,
+              effort_data=z,
+              single_survey=T,
+              # file_name = survey_map_file,
+              # km=T,
+              title=paste(m,y),
+              grid_label = F,
+              save=F,
+              print=T)
+  
+ # x <-  summary_all$species %>% filter(SurveyID==sids[i])
+ #  csasdown::csas_table(x, longtable = F,  escape = FALSE, font_size=9,  align=c("l","r","r","r","r","r"))
+ # 
+ # y <- eff %>% filter(SurveyID == sids[i])
+ #  csasdown::csas_table(y, longtable = F,  escape = FALSE, font_size=9,  align=c("l","r","r","r","r","r"))
+  # knitr::plot_crop(survey_map_file, quiet = T)
+# }
+}
+```
+
+```{r prep-indiv-survey-tables, fig.width=20}
+sids <- unique(all_effort_lines$SurveyID)
+  # dir <- paste0("C:/Users/keppele/Documents/CeMoRe/Analysis/cemore_analysis/output_maps/")
+ 
+eff <- inner_join(summary_all[[4]], summary_all[[3]]) %>% 
+  dplyr::select(c("Vessel" = Vessel_code, SurveyID,#"Start" = Date_Start_GMT, "End"=Date_End_GMT,
+                  "Field days"=field_days,"Survey days"=days,"Transects"=transects,"Km surveyed"=distance_km)) %>% as.data.frame() 
+ 
+ for(i in seq_along(sids)){
+   
+ x <-  summary_all$species %>% filter(SurveyID==sids[i])
+  csasdown::csas_table(x, longtable = F,  escape = FALSE, font_size=9,  align=c("l","r","r","r","r","r"))
+
+ y <- eff %>% filter(SurveyID == sids[i])
+  csasdown::csas_table(x, longtable = F,  escape = FALSE, font_size=9,  align=c("l","r","r","r","r","r"))
+ }
+
+
+```
+
+
+
+
+
+
+Created `r Sys.Date()`

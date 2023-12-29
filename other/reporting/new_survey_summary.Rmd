@@ -1,0 +1,616 @@
+---
+title: "CeMoRe Survey Summary Rollup"
+author: 
+date: 
+output: 
+  pdf_document: 
+    fig_caption: yes
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      collapse = TRUE,
+                      warning = FALSE,
+                      message = FALSE)
+# knitr::opts_chunk$set(fig.width=16
+# knitr::opts_chunk$set(out.width='16cm')
+ options(knitr.table.format = "latex")
+
+source("../../R/0 Setup.R")
+  #  cemore <- "C:/Users/keppele/Documents/GitHub/cemore/cemore"
+  # devtools::load_all(cemore)
+
+knitr::knit_hooks$set(inline=
+                        function(x){
+                          if(!is.numeric(x)){x
+                          }else{prettyNum(round(x,2),
+                                         big.mark=",")}})
+knitr::knit_hooks$set(inline=
+                        function(x){
+                          if(!is.numeric(x)){x
+                          }else{ifelse(x<10,as.character(english::as.english(x)),x)}})
+
+```
+
+```{r load_all_data}
+# Load previously saved data
+# all_effort <- load_effort(year, as.numeric(month), single_survey = F, vessel = "MB") 
+# saveRDS(all_effort, "output_cemore/all_effort/all_effort_to_2022_10.rds")
+all_effort <- readRDS(paste0("C:/users/keppele/documents/cemore/analysis/cemore_analysis/output_cemore/all_effort/all_effort_to_",year,"_",month, ".rds"))
+all_effort_lines <- readRDS(paste0("C:/users/keppele/documents/cemore/analysis/cemore_analysis/output_cemore/all_lines/all_effort_lines_to_",year,"_",month, ".rds")) #%>% 
+  # mutate(length_km = as.numeric(st_length(geometry))/1000) %>% 
+  # filter(length_km>0)
+# or all_effort_lines %<>% mutate(npts=npts(geometry,by_feature=T)) %>% filter(npts>1)
+# all_effort_lines <- get_effort_lines(all_effort)
+# saveRDS(all_effort_lines, "output_cemore/all_lines/all_effort_lines_to_2022_12.rds")
+# saveRDS(all_effort_lines, paste0("C:/users/keppele/documents/cemore/analysis/cemore_analysis/output_cemore/all_lines/all_effort_lines_to_",year,"_",month, ".rds"))
+# all_ap_sf <- load_sightings(year, as.numeric(month), single_survey = F, vessel="MB") 
+# saveRDS(all_ap_sf, "output_cemore/all_sgt/all_effort_sgt_to_2022_10.rds")
+all_ap_sf <- readRDS(paste0("C:/users/keppele/documents/cemore/analysis/cemore_analysis/output_cemore/all_sgt/all_cemore_effort_sgt_to_",year,"_",month,".rds"))
+# all_ap_sf <- load_sightings(year, as.numeric(month), single)
+
+#------------------------------------------------
+# create new tid's so they are ordered geographically NE to SW for alternate er_var mehtods
+# (ie. increasing distance from a point near Vancouver N of transects)
+#------------------------------------------------
+
+
+#------------------------------------------------
+summary_all <- survey_summary(single=F)
+
+sum_eff <- summary_all[[3]] %>% 
+  as.data.frame() %>% 
+  mutate(month_name=month.name[month])
+
+survey <- paste0(month.name[as.numeric(month)], " ", year)
+```
+
+All surveys to `r survey`
+
+This report provides a summary of the Cetacean Research Program’s field efforts to meet commitments under TMX Recommendations 5/6, including all surveys in the primary survey area aboard the MV Manyberries from September 2020 to `r survey`.
+
+# Field program overview
+In order to meet DFO’s commitments under TMX Recommendations 5 and 6, the Cetacean Research Program assembled a dedicated team for Cetacean Monitoring and Research (CeMoRe) in the southern Salish Sea in 2020, with efforts now expanding to the central coast of BC in collaboration with ESD’s Coastal Environmental Baseline program. Fieldwork is focused on better understanding the abundance, distribution, and behaviour of cetaceans in the TMX project area and the central coast. Field objectives include line-transect surveys, collection of genetic and photo-identification data from humpback whales, deployment of data-logging tags on humpback whales, and deployment of acoustic recorders. 
+
+Line-transect surveys were conducted monthly (weather permitting) from July 2020 to February 2023 in the TMX project area from Vancouver to Swiftsure Bank, and have since been conducted in that area approximately every second month (and on the central coast three times per year - central coast data not included here). These surveys are required to describe the seasonal distribution and estimate the abundance of cetaceans, and to address identified data gaps with respect to vessel strike risk for these species.
+
+Photo-identification and genetic data from humpback whales are being collected to inform population structure and movements of humpback whales in Canadian Pacific waters, and therefore the proportion of the North Pacific humpback whale population that is impacted by vessel strike risk in the project area. 
+
+Collaborative humpback whale tagging efforts have been conducted with researchers from Cascadia Research Collective (CRC) and Stanford University and are now being conducted by the CeMoRe team. Data from these tags provide insight into humpback whale dive behaviour in and around shipping lanes and how this behaviour influences their vulnerability to vessel strikes, including during nighttime hours and weather conditions in which visual surveys are not possible. 
+
+Acoustic recorders are being deployed to record the high-frequency clicks produced by porpoises. The acoustic data supplement boat-based visual surveys by providing insight into habitat use of porpoises that cannot be gained from visual surveys (i.e. how use of various water depths and habitat types may vary throughout day and night) and implications for vessel-related impacts on these species. Acoustic recorders are deployed systematically throughout the project area and data are downloaded from each recorder at least once every three months. 
+
+*The CeMoRe team’s next field effort is planned for February 1-15, 2024, on the Central Coast aboard the chartered Arctic Research Foundation vessel Tiriarnaq.* 
+
+<!-- During the recent field effort, the team was able to deploy tags on whales in the inside waters of Juan de Fuca, as well as in the more open waters on and around Swiftsure Bank (Figure 3). Data collected from these tags can therefore contribute to regional comparison of humpback whale movements and dive behaviour within the overall project area.   -->
+
+
+\newpage
+
+
+```{r list-surveys}
+cap <- paste0("All CeMoRe surveys to ", survey)
+csasdown::csas_table(surveys,longtable = F,  escape = FALSE, font_size=9,  align=c("l","r","r","r","r","r"), caption=cap)
+```
+
+\newpage
+
+# Survey effort 
+
+## Effort summary tables (September 2020 to `r survey`)
+Transect line surveys aboard MV Manyberries in Southern Salish Sea/Swiftsure Bank only. Additional surveys have been conducted in the primary survey area aboard CCGS Vector (not shown here) and on the north coast of BC since January 2023 (not shown here).
+
+Total distance surveyed = `r round(sum(st_length(all_effort_lines))/1000) %>% as.numeric()` km.
+
+```{r summarise survey distance}
+x <- all_effort_lines %>% mutate(length = st_length(geometry)) %>% st_drop_geometry() %>% filter(!is.na(length))
+
+eff_season <- x %>% 
+  transmute(Season = season, SurveyID = SurveyID, length = as.numeric(length),year) %>%
+  group_by(Season) %>% 
+  summarise("Number of surveys" = length(unique(SurveyID)), 
+            # "Number of years" = length(unique(year)),
+            "Years" = str_c((unique(year)), collapse=", "),
+            "Total survey length (km)" = round(sum(length/1000)))
+eff_month <- x %>% 
+  transmute(Season=season, Month= month_abb, SurveyID = SurveyID, length = as.numeric(length), year) %>%
+  group_by(Month, Season) %>%
+  summarise("Number of surveys" = length(unique(SurveyID)),
+            "Years" = str_c((unique(year)), collapse=", "),
+            "Total survey length (km)" = round(sum(length/1000)))
+eff_survey <- x  %>% 
+  # transmute(Year = year, Month= month_abb, length = as.numeric(length)) %>%
+  transmute(Year = year, Month=month_abb, month,Season = season, SurveyID = SurveyID, length = as.numeric(length)) %>%
+  # group_by(Year, Month) %>% 
+  group_by(Year, SurveyID, Season) %>% 
+  summarise("Total survey length (km)" = round(sum(length/1000)))
+
+# total number of survey days and total count cetacean sightings; days on effort per survey
+e1 <- all_effort %>% filter(Status == "ON", Vessel=="MB") %>% rename(Season = season) %>% 
+  dplyr::group_by(
+    # Year = year(GpsT),
+    # Month = factor(month.abb[month(GpsT)], levels = month.abb[1:12]),
+    Season) %>% 
+  dplyr::summarise("# days on effort" = n_distinct(day(GpsT)), "# transects" = n_distinct(Final.T.ID))
+
+
+e2 <- all_effort %>% filter(Status == "ON", Vessel=="MB") %>%
+  rename(Season = season,  Month = month_abb) %>% 
+  dplyr::group_by(Month, Season) %>% 
+  dplyr::summarise("# days on effort" = n_distinct(day(GpsT)), "# transects" = n_distinct(Final.T.ID))
+
+e3 <- all_effort %>% filter(Status == "ON", Vessel=="MB") %>% rename(Season = season) %>% 
+  dplyr::group_by(
+    SurveyID,# Year = year(GpsT),
+    Season
+        # Month = factor(month.abb[month(GpsT)], levels = month.abb[1:12])
+    ) %>% 
+  dplyr::summarise("# days on effort" = n_distinct(day(GpsT)), "# transects" = n_distinct(Final.T.ID))
+
+
+e_season <- dplyr::full_join(eff_season, e1)
+e_month <- dplyr::full_join(eff_month, e2)  
+e_survey <- dplyr::full_join(eff_survey, e3)
+```
+
+
+```{r effort-tables}
+survey_eff_tbl <- paste0("Effort per individual CeMoRe survey to ", survey, ".")
+
+csasdown::csas_table(e_survey,longtable = F,  escape = FALSE, font_size=9,  align=c("l","r","r","r","r","r"), caption = survey_eff_tbl)
+
+
+seasonal_eff_tbl <- paste0("Seasonal effort on CeMoRe surveys to ", survey, ".")
+
+csasdown::csas_table(e_season, longtable = F,  escape = FALSE, font_size=9,  align=c("l","r","r","r","r","r"), caption =seasonal_eff_tbl)
+
+
+monthly_eff_tbl <- paste0("Monthly effort on CeMoRe surveys to ", survey, ".")
+
+csasdown::csas_table(e_month,longtable = F,  escape = FALSE, font_size=9,  align=c("l","r","r","r","r","r","r"), caption = monthly_eff_tbl)
+```
+
+## Effort plots
+
+```{r prep-seasonyear-eff, results='hide'}
+seasonyear_eff_file <- paste0("C:/Users/keppele/Documents/CeMoRe/Analysis/cemore_analysis/output_maps/season_eff_by_year_to_", survey_title, ".png")
+
+seasonyear_eff_cap <- paste("Realized seasonal survey effort from September 2020 to", survey, ". Number of monthly surveys conducted and total realized effort in km displayed by season. Winter = January through March, spring = April through June, summer = July through September, fall = October through December.")
+# NOTE: have to plot this in RStudio, r-click to save-as and save as a png file, then crop, then comment this bit out again.
+# if(!file.exists(seasonyear_eff_file)){
+# plot_survey(bath=F,
+#             border = T,
+#             single_survey = F,
+#             season=  T,
+#             plot_sgt=F,
+#             N=T,
+#             km=T,
+#             by_seasonYear=T,
+#             colour_month=T,
+#             save=F,
+#             file_name = seasonyear_eff_file,
+#             print=T)
+# }
+  # knitr::plot_crop(seasonyear_eff_file, quiet = T)
+
+```
+
+
+
+```{r plot-seasonyear-eff, echo=F, fig.cap=seasonyear_eff_cap, fig.width = 18}
+knitr::include_graphics(seasonyear_eff_file)
+```
+
+```{r prep-seasonmonth-eff, results='hide'}
+season_month_eff_file <- paste0("C:/Users/keppele/Documents/CeMoRe/Analysis/cemore_analysis/output_maps/seasonal_month_eff_to_", survey_title, ".png")
+
+season_month_eff_cap <- paste("Realized seasonal survey effort from September 2020 to", month.name[numeric(month)], year, ". Number of monthly surveys conducted and total realized effort in km displayed by season. Winter = January through March, spring = April through June, summer = July through September, fall = October through December.")
+if(!file.exists(season_month_eff_file)){
+  plot_survey(bath=F,
+              border = T,
+              single_survey = F,
+              season=  T,
+              plot_sgt=F,
+              N=T,
+              km=T,
+              # by_seasonYear=T,
+              colour_month =T,
+              save=T,
+              file_name = season_month_eff_file,
+              grid_label = F,
+              print=F)
+  
+knitr::plot_crop(season_month_eff_file, quiet = T)
+}
+```
+
+```{r plot-seasonmonth-eff, echo=F, fig.cap=season_month_eff_cap}
+knitr::include_graphics(season_month_eff_file)
+```
+
+```{r prep-season-eff, results='hide'}
+season_eff_file <- paste0("C:/Users/keppele/Documents/CeMoRe/Analysis/cemore_analysis/output_maps/seasonal_eff_to_", survey_title, ".png")
+
+season_eff_cap <- paste("Realized seasonal survey effort from September 2020 to", month.name[numeric(month)], year, ". Number of monthly surveys conducted and total realized effort in km displayed by season. Winter = January through March, spring = April through June, summer = July through September, fall = October through December.")
+if(!file.exists(season_eff_file)){
+  plot_survey(bath=F,
+              border = T,
+              single_survey = F,
+              season=  T,
+              plot_sgt=F,
+              N=T,
+              km=T,
+              # by_seasonYear=T,
+              colour_year =T,
+              save=T,
+              file_name = season_eff_file,
+              grid_label = F,
+              print=F)
+  
+knitr::plot_crop(season_eff_file, quiet = T)
+}
+```
+
+```{r plot-season-eff, echo=F, fig.cap=season_eff_cap}
+knitr::include_graphics(season_eff_file)
+```
+
+\newpage
+
+<!-- ```{r prep-month-eff, results='hide'} -->
+<!-- month_eff_file <- paste0("C:/Users/keppele/Documents/CeMoRe/Analysis/cemore_analysis/output_maps/monthly_eff_to_", survey_title, ".png") -->
+
+<!-- month_eff_cap <- paste("Realized monthly survey effort from September 2020 to", month.name[numeric(month)], year, ". Number of monthly surveys conducted and total realized effort in km displayed by month.") -->
+<!-- if(!file.exists(month_eff_file)){ -->
+<!--   plot_survey(bath=F, -->
+<!--               border = T, -->
+<!--               single_survey = F, -->
+<!--               season=  T, -->
+<!--               plot_sgt=F, -->
+<!--               N=T, -->
+<!--               km=T, -->
+<!--               # by_seasonYear=T, -->
+<!--               colour_year=T, -->
+<!--               facet_month = T, -->
+<!--               save=T, -->
+<!--               file_name = month_eff_file, -->
+<!--               grid_label = F, -->
+<!--               print=F) -->
+
+<!-- knitr::plot_crop(month_eff_file, quiet = T) -->
+<!-- } -->
+<!-- ``` -->
+
+<!-- ```{r plot-month-eff, echo=F, fig.cap=month_eff_cap, out.width = "90%"} -->
+<!-- knitr::include_graphics(month_eff_file) -->
+<!-- ``` -->
+
+
+<!-- # ```{r plot-indiv-surveys} -->
+<!-- #  for(i in seq_along(sids)){ -->
+<!-- #    survey_map_file <- paste0("C:/Users/keppele/Documents/CeMoRe/Analysis/cemore_analysis/output_maps/survey_maps/summary_map_", sids[i], ".png") -->
+<!-- #  knitr::include_graphics(survey_map_file) -->
+<!-- #  } -->
+<!-- # ``` -->
+
+
+<!-- ```{r prep-seasonal-species} -->
+<!-- spp <- unique(all_ap_sf$Species) -->
+
+<!-- for(i in seq_along(spp)){ -->
+<!--   # sp_map_file <- paste0(dir, "species_season_sgts_maps/", spp[i], ".png") -->
+<!--   # if(!file.exists(sp_map_file)){ -->
+<!--   sp <- spp[i] -->
+<!--   plot_survey(single_survey=F, -->
+<!--               species = sp, -->
+<!--               title=paste(sp), -->
+<!--               grid_label = F, -->
+<!--               effort_colour = "grey50", -->
+<!--               season=T, -->
+<!--               save=F, -->
+<!--               file_name = sp_map_file, -->
+<!--               print=T) -->
+<!--   # knitr::plot_crop(sp_map_file, quiet = T) -->
+<!--   # } -->
+<!-- } -->
+
+
+<!-- ``` -->
+
+<!-- ```{r plot-spp-maps} -->
+<!-- files <- list.files(paste0(dir,"species_season_sgts_maps"), -->
+<!--                     full.names = TRUE) -->
+
+<!-- knitr::include_graphics(files, error = FALSE) -->
+<!-- ``` -->
+
+\newpage
+
+# Survey sightings (September 2020 to `r survey`)
+
+## Sightings summary table
+
+```{r all-sgts}
+
+csasdown::csas_table(summary_all$species 
+,longtable = F,  escape = FALSE, font_size=9,  align=c("l","r","r","r","r","r"), caption = "Species sightings from all surveys")
+```
+
+
+## Species sightings maps
+
+### Humpback whales
+```{r monthly-hw, echo=FALSE,results='hide'}
+sp <- "humpback whale"
+# png("figs/seasonYear_hw.png")
+plot_survey(
+  bath=F,
+  save=T,
+  # high_res=T,
+  file_name = paste0("knitr-figs-pdf/",sp,"_season_stg_map_to_",survey_title,".png"),
+  # data=ap_sf2022,
+  border=F,
+  single_survey=F,
+  plot_sgt=T,
+  plot_effort = T,
+  # effort_data = effort_lines2022,
+  # show_transit=F,
+  # N=T,
+  # km=T,
+  # depth=T,
+  legend = T,
+  leg.pos= "bottom",
+  species=sp,
+  season=T,
+  effort_colour = "grey50",
+  by_seasonYear = F,
+  print=F)
+# dev.off()
+# suppressMessages(ggsave(paste0("knitr-figs-pdf/",sp,"_season_stg_map_to_",survey_title,".png")))
+knitr::plot_crop(paste0("knitr-figs-pdf/",sp,"_season_stg_map_to_", survey_title,".png"), quiet=T)
+
+hw_cap <- paste0("Humpback whale on-effort sightings and realized survey effort by season and from September 2020 to ", survey_title, ". Relative point size indicates group size for each sighting. Total realized effort in km displayed by season for each year.")
+```
+
+```{r plot-hw,fig.width=12,fig.cap=hw_cap, fig.width=20}
+knitr::include_graphics(paste0("knitr-figs-pdf/",sp,"_season_stg_map_to_",survey_title,".png"))
+
+```
+
+```{r hw}
+data <- summary_all$species %>% filter(Species==sp)
+season <- data %>% group_by(Species,season) %>% summarise(number_sightings=sum(number_sightings),
+                                                       number_individuals=sum(number_individuals))
+season_year <- data %>% group_by(Species, season, year) %>% summarise(number_sightings=sum(number_sightings),
+                                                       number_individuals=sum(number_individuals))
+
+csasdown::csas_table(season,longtable = F,  escape = FALSE, font_size=9,  align=c("l","r","r","r"))
+csasdown::csas_table(data,longtable = F,  escape = FALSE, font_size=9,  align=c("l","r","r","r","r","r"))
+csasdown::csas_table(season_year,longtable = F,  escape = FALSE, font_size=9,  align=c("l","r","r","r","r"))
+```
+
+\newpage
+
+### Harbour porpoise
+
+```{r monthly-hp, echo=FALSE,results='hide'}
+sp <- "harbour porpoise"
+plot_survey(
+  bath=F,
+  save=T,
+  # high_res=T,
+  file_name = paste0("knitr-figs-pdf/",sp,"_season_stg_map_to_",survey_title,".png"),
+  # data=ap_sf2022,
+  border=F,
+  single_survey=F,
+  plot_sgt=T,
+  plot_effort = T,
+  # effort_data = effort_lines2022,
+  # show_transit=F,
+  # N=T,
+  # km=T,
+  # depth=T,
+  legend = T,
+  leg.pos= "bottom",
+  species=sp,
+  season=T,
+  effort_colour = "grey50",
+  by_seasonYear = F,
+  print=F)
+# dev.off()
+# suppressMessages(ggsave(paste0("knitr-figs-pdf/",sp,"_season_stg_map_to_",survey_title,".png")))
+knitr::plot_crop(paste0("knitr-figs-pdf/",sp,"_season_stg_map_to_", survey_title,".png"), quiet=T)
+
+hp_cap <- paste0("Harbour porpoise on-effort sightings and realized survey effort by season and from September 2020 to ", survey_title, ". Relative point size indicates group size for each sighting. Total realized effort in km displayed by season for each year.")
+```
+
+```{r plot-hp,fig.width=12,fig.cap=hp_cap, fig.width=20}
+knitr::include_graphics(paste0("knitr-figs-pdf/",sp,"_season_stg_map_to_",survey_title,".png"))
+
+```
+
+```{r hp}
+data <- summary_all$species %>% filter(Species==sp)
+season <- data %>% group_by(Species,season) %>% summarise(number_sightings=sum(number_sightings),
+                                                       number_individuals=sum(number_individuals))
+season_year <- data %>% group_by(Species, season, year) %>% summarise(number_sightings=sum(number_sightings),
+                                                       number_individuals=sum(number_individuals))
+
+csasdown::csas_table(season,longtable = F,  escape = FALSE, font_size=9,  align=c("l","r","r","r"))
+csasdown::csas_table(data,longtable = F,  escape = FALSE, font_size=9,  align=c("l","r","r","r","r","r"))
+csasdown::csas_table(season_year,longtable = F,  escape = FALSE, font_size=9,  align=c("l","r","r","r","r"))
+```
+
+\newpage
+
+### Dall's porpoise
+
+```{r monthly-dp, echo=FALSE,results='hide', fig.width=20}
+sp <- "Dall's porpoise"
+plot_survey(
+  bath=F,
+  save=T,
+  # high_res=T,
+  file_name = paste0("knitr-figs-pdf/",sp,"_season_stg_map_to_",survey_title,".png"),
+  # data=ap_sf2022,
+  border=F,
+  single_survey=F,
+  plot_sgt=T,
+  plot_effort = T,
+  # effort_data = effort_lines2022,
+  # show_transit=F,
+  # N=T,
+  # km=T,
+  # depth=T,
+  legend = T,
+  leg.pos= "bottom",
+  species=sp,
+  season=T,
+  effort_colour = "grey50",
+  by_seasonYear = F,
+  print=F)
+# dev.off()
+# suppressMessages(ggsave(paste0("knitr-figs-pdf/",sp,"_season_stg_map_to_",survey_title,".png")))
+knitr::plot_crop(paste0("knitr-figs-pdf/",sp,"_season_stg_map_to_", survey_title,".png"), quiet=T)
+
+dp_cap <- paste0("Dall's porpoise on-effort sightings and realized survey effort by season and from September 2020 to ", survey_title, ". Relative point size indicates group size for each sighting. Total realized effort in km displayed by season for each year.")
+```
+
+```{r plot-dp,fig.width=12,fig.cap=dp_cap, fig.width=18}
+knitr::include_graphics(paste0("knitr-figs-pdf/",sp,"_season_stg_map_to_",survey_title,".png"))
+```
+
+```{r dp}
+data <- summary_all$species %>% filter(Species==sp)
+season <- data %>% group_by(Species,season) %>% summarise(number_sightings=sum(number_sightings),
+                                                       number_individuals=sum(number_individuals))
+season_year <- data %>% group_by(Species, season, year) %>% summarise(number_sightings=sum(number_sightings),
+                                                       number_individuals=sum(number_individuals))
+
+csasdown::csas_table(season,longtable = F,  escape = FALSE, font_size=9,  align=c("l","r","r","r"))
+csasdown::csas_table(data,longtable = F,  escape = FALSE, font_size=9,  align=c("l","r","r","r","r","r"))
+csasdown::csas_table(season_year,longtable = F,  escape = FALSE, font_size=9,  align=c("l","r","r","r","r"))
+
+```
+
+\newpage
+
+### Killer whales
+
+```{r seasonal-kw, echo=FALSE,results='hide'}
+ap_sf <- all_ap_sf %>% filter(Species %like% "killer")
+
+ap_sf$Species %<>% droplevels()
+# to order legend symbols consistently
+sp <- unique(ap_sf$Species)
+
+plot_survey(
+  bath=F,
+  save=T,
+  # high_res=T,
+  file_name = paste0("knitr-figs-pdf/kw_stg_map_to_",survey_title,".png"),
+  # data=ap_sf2022,
+  border=F,
+  single_survey=F,
+  plot_sgt=T,
+  plot_effort = T,
+  # effort_data = effort_lines2022,
+  # show_transit=F,
+  # N=T,
+  # km=T,
+  # depth=T,
+  legend = T,
+  leg.pos= "bottom",
+  species=sp,
+  # season=T,
+  effort_colour = "grey50",
+  by_seasonYear = F,
+  print=F)
+# dev.off()
+# suppressMessages(ggsave(paste0("knitr-figs-pdf/kw_season_stg_map_to_",survey_title,".png")))
+knitr::plot_crop(paste0("knitr-figs-pdf/kw_stg_map_to_", survey_title,".png"), quiet=T)
+
+kw_cap <- paste0("Killer whale on-effort sightings and realized survey effort from September 2020 to ", survey_title, ". Relative point size indicates group size for each sighting. Total realized effort in km displayed by season for each year.")
+```
+
+```{r plot-kw,fig.width=12,fig.cap=kw_cap, fig.width=20}
+knitr::include_graphics(paste0("knitr-figs-pdf/kw_stg_map_to_", survey_title,".png"))
+```
+
+
+```{r kw}
+data <- summary_all$species %>% filter(Species %in% sp)
+season <- data %>% group_by(Species,season) %>% summarise(number_sightings=sum(number_sightings),
+                                                       number_individuals=sum(number_individuals))
+season_year <- data %>% group_by(Species, season, year) %>% summarise(number_sightings=sum(number_sightings),
+                                                       number_individuals=sum(number_individuals))
+
+csasdown::csas_table(season,longtable = F,  escape = FALSE, font_size=9,  align=c("l","r","r","r"))
+csasdown::csas_table(data,longtable = F,  escape = FALSE, font_size=9,  align=c("l","r","r","r","r","r"))
+csasdown::csas_table(season_year,longtable = F,  escape = FALSE, font_size=9,  align=c("l","r","r","r","r"))
+
+```
+\newpage
+
+### Other species sightings
+
+```{r seasonal-non-target, results='hide',echo=FALSE}
+ap_sf <- all_ap_sf %>% filter(!Species %in% c("humpback whale",
+                                              "Dall's porpoise",
+                                              "harbour porpoise"),
+                              !Species %like% "killer")
+
+ap_sf$Species %<>% droplevels()
+# to order legend symbols consistently
+sp <- unique(ap_sf$Species)
+
+plot_survey(
+  bath=F,
+  save=T,
+  # high_res=T,
+  file_name = paste0("knitr-figs-pdf/non-target_stg_map_to_",survey_title,".png"),
+  # data=ap_sf2022,
+  border=F,
+  single_survey=F,
+  plot_sgt=T,
+  plot_effort = T,
+  # effort_data = effort_lines2022,
+  # show_transit=F,
+  # N=T,
+  # km=T,
+  # depth=T,
+  legend = T,
+  leg.pos= "bottom",
+  species=sp,
+  # season=T,
+  effort_colour = "grey50",
+  by_seasonYear = F,
+  print=F)
+# dev.off()
+# suppressMessages(ggsave(paste0("knitr-figs-pdf/non-target_season_stg_map_to_",survey_title,".png")))
+knitr::plot_crop(paste0("knitr-figs-pdf/non-target_stg_map_to_", survey_title,".png"), quiet=T)
+
+other_cap <- paste0("Non-target species on-effort sightings and realized survey effort from September 2020 to ", survey_title, ". Relative point size indicates group size for each sighting. Total realized effort in km displayed by season for each year.")
+```
+
+```{r plot-non-target,fig.width=12,fig.cap=other_cap, fig.width=20}
+knitr::include_graphics(paste0("knitr-figs-pdf/non-target_stg_map_to_", survey_title,".png"))
+```
+
+```{r other}
+other <- summary_all$species %>% filter(Species %in% sp)
+# csasdown::csas_table(other,longtable = F,  escape = FALSE, font_size=9,  align=c("l","r","r","r","r","r"))
+# 
+# season <- other %>% group_by(Species, season) %>% summarise(number_sightings=sum(number_sightings),
+#                                                        number_individuals=sum(number_individuals))
+# csasdown::csas_table(season,longtable = F,  escape = FALSE, font_size=9,  align=c("l","r","r","r"))
+
+season_year <- other %>% group_by(Species, season, year) %>% summarise(number_sightings=sum(number_sightings),
+                                                       number_individuals=sum(number_individuals), Survey=unique(SurveyID))
+csasdown::csas_table(season_year,longtable = F,  escape = FALSE, font_size=9,  align=c("l","r","r","r","r","r"))
+```
+
+
+
+

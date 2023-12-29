@@ -1,7 +1,7 @@
 # # Load raw data, tidy and format it for running Eva's code, run Eva's code
 # 
 # TO DO: CORRECT HOE FOR RB IN HOE.TXT
-# source("R/0 Setup.R")
+source("R/0 Setup.R")
 # iterations <- data.frame(cbind(
 #   year = c(rep(2020,3),rep(2021, 11),rep(2022,3)),
 #   month_abb =c("Sep", "Oct", "Nov", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Oct", "Nov", "Dec","Jan","Feb","Apr"),
@@ -10,8 +10,9 @@
 # ----------------------------------------------------------------------
 # ----------------- SET SURVEY DATE --------------------------------
 # ----------------------------------------------------------------------
-# {year <- 2021
-# month <- "02"
+# {
+# year <- 2023
+# month <- "10"
 # month_abb <- month.abb[as.numeric(month)]
 # survey_title <- paste(first_up(month_abb), year)
 # folder = paste0("survey_data/raw_data/",year, "-", month)
@@ -30,16 +31,17 @@
 # if there are any instances where there are 2 'final' mysti versions or tracklines,
 # run combine_mysti() or combine_tracklines prior to this step
 # combine_mysti_obs(2023,"01",12)
-# combine_mysti_tracks(2023,"01",12)
+# combine_mysti_tracks(2023,"09","09")
 # 
-data <- get_obs_data(year=year,month=month, data.source = "cemore", vessel = vessel)
+data <- get_obs_data(year=year,month=month, data.source = data.source, vessel = vessel)
+# data <- get_obs_data(year=year,month=month, data.source = "cemore", vessel = vessel)
 # data <- readRDS(paste0("survey_data/raw_data/collated_rds/cemore_survey_raw_data_", year, month, ".rds"))
 
 # check comments fields
 data$effort$QA.QC_Comments[which(!data$effort$QA.QC_Comments=="")]
 data$effort$Comments[which(!data$effort$Comments=="")]
 
-data$sightings$Comments[which(!data$sightings$Comments=="")]
+data.frame(data$sightings$time_index[which(!data$sightings$Comments=="")], data$sightings$Comments[which(!data$sightings$Comments=="")])
 # data$sightings[which(!is.na(data$sightings$C=omments))]
 
 #create surveyID .txt file required for processing code
@@ -58,10 +60,13 @@ if(year==2020 & month==11) vessel <- "RB"
 if(year==2021 & month==12) vessel <- "VE"
 if(year==2022 & month_abb=="Mar") vessel <- "TA"
 if(year==2023 & month_abb=="Jan") vessel <- "FR"
+if(year==2023 & month_abb=="Jun") vessel <- "TI"
+if(year==2023 & month_abb=="Oct") vessel <- "MB"
 survey$Vessel_code <- vessel
 if(data.source=="cemore") write.table(survey,file.path(data_path,paste0(data.source,"_",year,tolower(month_abb),"_dataSurveyID.txt")))
-# if(data.source=="mmcp") write.table(survey,file.path(data_path,paste0(data.source,"_",year,tolower(month_abb),"_",vessel,"_dataSurveyID.txt")))
+if(data.source=="mmcp") write.table(survey,file.path(data_path,paste0(data.source,"_",year,tolower(month_abb),"_",vessel,"_dataSurveyID.txt")))
 }
+# data$sightings[which(data$sightings$time_index=="2023-07-16 20:19:12"),]$Distance..m. <- data$sightings[which(data$sightings$time_index=="2023-07-16 20:19:12"),]$Distance..m./1000
 
 # 
 # if(data.source=="cemore") survey <- read.table(file.path(data_path,paste0(data.source,"_",year,tolower(month_abb),"_dataSurveyID.txt")))
@@ -70,7 +75,8 @@ if(data.source=="cemore") write.table(survey,file.path(data_path,paste0(data.sou
 # # process data for any corrections and create 'tidy data'
 # 
 # source(paste0(cemore, "/data_processing_scripts/data_corrections.R"))
-# # source(paste0(cemore, "/data_processing_scripts/data_corrections_mmcp.R"))
+
+source(paste0(cemore, "/data_processing_scripts/data_corrections_mmcp.R"))
 # 
 # #---------------------------------------------------------------
 # # Special cases, check data for incidental sightings of interest
@@ -91,7 +97,7 @@ if(data.source=="cemore") write.table(survey,file.path(data_path,paste0(data.sou
 {
   # rm(list = ls(all=TRUE))
   # cemore <- "C:/Users/keppele/Documents/GitHub/cemore/cemore"
-  # devtools::load_all(cemore)
+  devtools::load_all(cemore)
   # data.source = "cemore"
   # vessel = "MB"
   
@@ -124,29 +130,32 @@ if(data.source=="cemore") write.table(survey,file.path(data_path,paste0(data.sou
 #-------------------------------------------------------------------
 
 single <- T
-effort <- load_effort(year, month, single)
+effort <- load_effort(year, month, single,data.source = data.source, vessel=vessel)
 effort_lines <- get_effort_lines(effort)
-ap_sf <- load_sightings(year, month, single)
+ap_sf <- load_sightings(year, month, single,data.source = data.source, vessel=vessel)
 
 
 
 # saveRDS(effort, paste0("C:/users/keppele/documents/github/cemore/tech_report/output/effort_", year, "_",month, ".rds"))
-saveRDS(effort, paste0("output_",data.source,"/effort/effort_ ", year, "_",month, ".rds"))
+# saveRDS(effort, paste0("output_",data.source,"/effort/effort_", year, "_",month, ".rds"))
+saveRDS(effort, paste0("output_",data.source,"/effort/effort_", year, "_",month,"_", vessel, ".rds"))
 
 # saveRDS(effort_lines, paste0("C:/users/keppele/documents/github/cemore/tech_report/output/effort_lines_ ", year, "_",month, ".rds"))
-saveRDS(effort_lines, paste0("output_",data.source,"/effort_lines/effort_lines_ ", year, "_",month, ".rds"))
+# saveRDS(effort_lines, paste0("output_",data.source,"/effort_lines/effort_lines_", year, "_",month, ".rds"))
+saveRDS(effort_lines, paste0("output_",data.source,"/effort_lines/effort_lines_", year, "_",month, "_",vessel,".rds"))
 
 # saveRDS(ap_sf, paste0("C:/users/keppele/documents/github/cemore/tech_report/output/effort_sgt_ ", year, "_",month, ".rds"))
-saveRDS(ap_sf, paste0("output_",data.source,"/sgt/effort_sgt_ ", year, "_",month, ".rds"))
+# saveRDS(ap_sf, paste0("output_",data.source,"/effort_sgt/effort_sgt_", year, "_",month, ".rds"))
+saveRDS(ap_sf, paste0("output_",data.source,"/effort_sgt/effort_sgt_", year, "_",month, "_",vessel, ".rds"))
 
 # #-------------------------------------------------------------------
 # # ----------------------- SAVE ALL SURVEYS --------------------
 # #-------------------------------------------------------------------
-survey_title <- paste(first_up(month_abb), year)
+# survey_title <- paste(first_up(month_abb), year)
 
-all_effort <- load_effort(year, month, single=F, vessel = "MB")
+all_effort <- load_effort(year, month, single=F, data.source = data.source)
 all_effort_lines <- get_effort_lines(all_effort)
-all_ap_sf <- load_sightings(year, month, single=F, vessel = "MB")
+all_ap_sf <- load_sightings(year, month, single=F,data.source = data.source)
 
 saveRDS(all_effort, paste0("C:/users/keppele/documents/github/cemore/tech_report/output_cemore/all_effort_to_", year, "_",month, ".rds"))
 saveRDS(all_effort, paste0("output_",data.source,"/all_effort/all_effort_to_", year, "_",month, ".rds"))
@@ -157,6 +166,11 @@ saveRDS(all_effort_lines, paste0("output_",data.source,"/all_lines/all_effort_li
 saveRDS(all_ap_sf, paste0("C:/users/keppele/documents/github/cemore/tech_report/output_cemore/all_effort_sgt_to_", year, "_",month, ".rds"))
 saveRDS(all_ap_sf, paste0("output_",data.source,"/all_sgt//all_effort_sgt_to_", year, "_",month, ".rds"))
 
-# # all_ap_sf %>% data.frame() %>% group_by(SurveyID) %>% summarise(diff=sum(!(!is.na(port_visib)==!is.na(stbd_visib))))
-# # unique(all_ap_sf$Species)
-# 
+# all_ap_sf %>% data.frame() %>% group_by(SurveyID) %>% summarise(diff=sum(!(!is.na(port_visib)==!is.na(stbd_visib))))
+# unique(all_ap_sf$Species)
+
+x <- survey_summary(single=F,2023, 8, T, "mmcp")
+x[1]
+x[2]
+x[3]
+x[4]

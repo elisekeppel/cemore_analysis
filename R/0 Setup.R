@@ -33,15 +33,17 @@
 }
 
 { 
-  year <- 2022
-  month <- "10"
+  year <- 2023
+  month <- "11"
   vessel <- "MB"
-  # iteration <- "27"
-   month_abb <- month.abb[as.numeric(month)]
+  iteration <- "30"
+  # iteration <- "2023b"
+  month_abb <- month.abb[as.numeric(month)]
   survey_title <- paste(first_up(month_abb), year)
   data.source <- "cemore"
   # data.source <- "mmcp"
-  surveyid = paste0(data.source,"_", year, tolower(month_abb))#,"_",vessel)
+  surveyid = paste0(data.source,"_", year, tolower(month_abb))
+  # surveyid = paste0(data.source,"_", year, tolower(month_abb),"_",vessel)
   main.dir <- "survey_data"
   # main.dir <- "mmcp_data"
   rds <- file.path(dir, main.dir, "surveys.rds")
@@ -101,22 +103,45 @@ surveys <- readRDS(rds)
 # surveys <- surveys[1:nrow(surveys)-1,]
 # surveys$SurveyID <- paste0(surveys$SurveyID, "_MB")
 # iteration <- surveys$iteration[which(surveys$year == year & surveys$month_abb == month_abb & surveys$SurveyID == surveyid)]
+
+if(!iteration %in% surveys$iteration){
+  objectives <- readline(prompt = cat(paste("Please type survey objectives [click here & type ie. Line-transect surveys & hit Enter]    \n\n"), sep = " "))
+  
+  i <- nrow(surveys)+1
+  levels(surveys$SurveyID) <- c(unique(surveys$SurveyID), surveyid)
+  surveys[i,] <- c(year,month_abb,iteration,paste0(surveyid),"Line-transect surveys")
+  # surveys[i,] <- c(year,month_abb,iteration,paste0(surveyid),objectives, vessel)
+  
+  rds <- file.path(dir, main.dir, "surveys.rds")
+  saveRDS(surveys, rds)
+  # saveRDS(surveys,
+  #         file.path("C:/users/keppele/documents/github/cemore/tech_report/data", "surveys.rds"))
+  csv <- file.path(dir,main.dir, "surveys.csv")
+  write.csv(surveys, csv, row.names=F)
+}
+
+# fix surveyid col, and add vessel column
+# surveys$SurveyID <- gsub("_VE", "", surveys$SurveyID)
+# surveys$vessel <- substr(surveys$SurveyID, 16, 17)
+# surveys[which(surveys$vessel==""),]$vessel <- "MB"
+
+# Add other vessel surveys
+# surveyid = paste0(data.source,"_", 2022, "mar")#,"_",vessel)
+# mar2022 <- c(2022,"Mar","TA2022-03",paste0(surveyid),"Line-transect surveys", "TA")
+# surveyid = paste0(data.source,"_", 2023, "jun")#,"_",vessel)
+# jun2023 <- c(2023,"Jun","TI2023-06",paste0(surveyid),"Line-transect surveys; photo-identification and genetic sampling of humpback whales", "TI")
+# surveyid = paste0(data.source,"_", 20223, "oct")#,"_",vessel)
+# oct2023 <- c(2023,"Oct","TI2023-10",paste0(surveyid),"Line-transect surveys; deployment and recovery of acoustic recorders; photo-identification and genetic sampling of humpback whales", "TI")
 # 
-# if(!iteration %in% surveys$iteration){
-#   i <- nrow(surveys)+1
-#   levels(surveys$SurveyID) <- c(unique(surveys$SurveyID), surveyid)
-#   surveys[i,] <- c(year,month_abb,iteration,vessel,surveyid,"Line-transect surveys")
-#   
-#   rds <- file.path(dir, "survey_data/surveys.rds")
-#   saveRDS(surveys, rds)
-#   saveRDS(surveys, 
-#           file.path("C:/users/keppele/documents/github/cemore/tech_report/data", "surveys.rds"))
-#   csv <- file.path(dir, "survey_data/surveys.csv")
-#   write.csv(surveys, csv, row.names=F)
-# }
+# surveys <- rbind(surveys[1:18,], mar2022, surveys[19:28,], jun2023, surveys[29:30,], oct2023, surveys[31,])
+# 
+# lev<- c(unique(surveys$SurveyID))
+# surveys$SurveyID <- factor(surveys$SurveyID, levels=lev)
+
+
 
 ## Remove any unwanted lines (ie. from testing)
-# surveys <- surveys[1:25,]
+# surveys <- surveys[1:28,]
 # saveRDS(surveys, rds)
 # csv <- file.path(dir, "survey_data/surveys.csv")
 # write.csv(surveys, csv, row.names=F)

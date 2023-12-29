@@ -1,0 +1,290 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+<Document id="root_doc">
+<Schema name="t_sp" id="t_sp">
+	<SimpleField name="Transect" type="float"></SimpleField>
+	<SimpleField name="Subarea" type="string"></SimpleField>
+</Schema>
+<Folder><name>t_sp</name>
+  <Placemark>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#t_sp">
+		<SimpleData name="Transect">1</SimpleData>
+		<SimpleData name="Subarea">Prince Rupert</SimpleData>
+	</SchemaData></ExtendedData>
+      <LineString><coordinates>-130.252449809576,54.3951377614566 -130.273892967446,54.3514401820018 -130.294408969773,54.3341578478517 -130.344866751076,54.3156945851735 -130.369900019309,54.3085587576758 -130.367216913664,54.2818405247723 -130.35720730262,54.2544855237865 -130.362409360596,54.2423310351605 -130.351945981356,54.2357762295199 -130.34254982943,54.220997729129 -130.304991544512,54.1942599370413</coordinates></LineString>
+  </Placemark>
+  <Placemark>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#t_sp">
+		<SimpleData name="Transect">2</SimpleData>
+		<SimpleData name="Subarea">Grenville</SimpleData>
+	</SchemaData></ExtendedData>
+      <LineString><coordinates>-130.187731983466,53.9191776563839 -130.0965902939,53.889350893406 -129.91587667536,53.768992567302 -129.84367677546,53.7331944695392 -129.788910254534,53.6942121809228 -129.739386238556,53.6434665512842 -129.691752867368,53.5950690711793 -129.656410403976,53.5718831411124 -129.650378837067,53.5660108582319 -129.593181778926,53.5335107016949 -129.53237777339,53.4950434853953 -129.327609540981,53.3689386438341</coordinates></LineString>
+  </Placemark>
+  <Placemark>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#t_sp">
+		<SimpleData name="Transect">3</SimpleData>
+		<SimpleData name="Subarea">Work Channel</SimpleData>
+	</SchemaData></ExtendedData>
+      <LineString><coordinates>-130.255034270737,54.5079736655312 -130.30685265063,54.5554276322431 -130.334676033127,54.5888512347875 -130.375789724457,54.6140996024994 -130.417296422908,54.6352470494111</coordinates></LineString>
+  </Placemark>
+  <Placemark>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#t_sp">
+		<SimpleData name="Transect">4</SimpleData>
+		<SimpleData name="Subarea">Porcher</SimpleData>
+	</SchemaData></ExtendedData>
+      <LineString><coordinates>-130.267881432382,54.064532236557 -130.18674964588,53.9545325092909 -130.283104435106,53.8808092850443 -130.308366968787,53.8661343753791 -130.315532880714,53.8545638736172 -130.311721221927,53.8178083026318 -130.30997494561,53.8090167526013 -130.266052810954,53.8069990977979</coordinates></LineString>
+  </Placemark>
+  <Placemark>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#t_sp">
+		<SimpleData name="Transect">5</SimpleData>
+		<SimpleData name="Subarea">Petrel Channel</SimpleData>
+	</SchemaData></ExtendedData>
+      <LineString><coordinates>-130.2661720657,53.8059051500476 -130.235515211034,53.7998606741192 -130.222072938221,53.7826268085485 -130.2119969559,53.7490418780158 -130.220881317586,53.7379082533908 -130.219126742557,53.7246893025675 -130.200152433539,53.7142885566395 -130.170931312628,53.7138335884263 -130.153560557793,53.7109939457771 -130.1117300899,53.694607398147 -130.101698493512,53.6730644889068 -130.108125962873,53.6664501259279 -130.095989201275,53.6233377981974 -130.072498639566,53.5828252637536 -130.029947306045,53.5527787536303</coordinates></LineString>
+  </Placemark>
+  <Placemark>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#t_sp">
+		<SimpleData name="Transect">6</SimpleData>
+		<SimpleData name="Subarea">Chatham Sound</SimpleData>
+	</SchemaData></ExtendedData>
+      <LineString><coordinates>-130.694718962426,54.7058648532379 -130.40319211106,54.6646464260328</coordinates></LineString>
+  </Placemark>
+  <Placemark>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#t_sp">
+		<SimpleData name="Transect">7</SimpleData>
+		<SimpleData name="Subarea">Chatham Sound</SimpleData>
+	</SchemaData></ExtendedData>
+      <LineString><coordinates>-130.423569773375,54.6407356656422 -130.767819382005,54.5606535889971</coordinates></LineString>
+  </Placemark>
+  <Placemark>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#t_sp">
+		<SimpleData name="Transect">8</SimpleData>
+		<SimpleData name="Subarea">Chatham Sound</SimpleData>
+	</SchemaData></ExtendedData>
+      <LineString><coordinates>-130.838462921996,54.519635086862 -130.386517253497,54.4559266497462</coordinates></LineString>
+  </Placemark>
+  <Placemark>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#t_sp">
+		<SimpleData name="Transect">9</SimpleData>
+		<SimpleData name="Subarea">Chatham Sound</SimpleData>
+	</SchemaData></ExtendedData>
+      <LineString><coordinates>-130.484689479821,54.3994633266761 -130.808951766683,54.3205054702384</coordinates></LineString>
+  </Placemark>
+  <Placemark>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#t_sp">
+		<SimpleData name="Transect">10</SimpleData>
+		<SimpleData name="Subarea">Chatham Sound</SimpleData>
+	</SchemaData></ExtendedData>
+      <LineString><coordinates>-130.806345368586,54.3133072436201 -130.413025442026,54.2546267079896</coordinates></LineString>
+  </Placemark>
+  <Placemark>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#t_sp">
+		<SimpleData name="Transect">11</SimpleData>
+		<SimpleData name="Subarea">Chatham Sound</SimpleData>
+	</SchemaData></ExtendedData>
+      <LineString><coordinates>-130.336770509657,54.2084746131003 -130.638053608153,54.1322535862991</coordinates></LineString>
+  </Placemark>
+  <Placemark>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#t_sp">
+		<SimpleData name="Transect">12</SimpleData>
+		<SimpleData name="Subarea">Chatham Sound</SimpleData>
+	</SchemaData></ExtendedData>
+      <LineString><coordinates>-130.728576646024,54.097333269781 -130.63526824388,54.0688667743634 -130.591249079726,54.0553987464832 -130.553435065464,54.0438093996407</coordinates></LineString>
+  </Placemark>
+  <Placemark>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#t_sp">
+		<SimpleData name="Transect">13</SimpleData>
+		<SimpleData name="Subarea">Hecate Strait</SimpleData>
+	</SchemaData></ExtendedData>
+      <LineString><coordinates>-129.953333792158,53.104161959531 -130.308905862171,53.1496264795781</coordinates></LineString>
+  </Placemark>
+  <Placemark>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#t_sp">
+		<SimpleData name="Transect">14</SimpleData>
+		<SimpleData name="Subarea">Hecate Strait</SimpleData>
+	</SchemaData></ExtendedData>
+      <LineString><coordinates>-130.322458233284,53.1591969696869 -130.076955035021,53.2552384662135</coordinates></LineString>
+  </Placemark>
+  <Placemark>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#t_sp">
+		<SimpleData name="Transect">15</SimpleData>
+		<SimpleData name="Subarea">Hecate Strait</SimpleData>
+	</SchemaData></ExtendedData>
+      <LineString><coordinates>-130.154675125364,53.3309214349129 -130.575033388259,53.3364828954708</coordinates></LineString>
+  </Placemark>
+  <Placemark>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#t_sp">
+		<SimpleData name="Transect">16</SimpleData>
+		<SimpleData name="Subarea">Hecate Strait</SimpleData>
+	</SchemaData></ExtendedData>
+      <LineString><coordinates>-130.583261354478,53.3422239648743 -130.348367883231,53.4225219615317</coordinates></LineString>
+  </Placemark>
+  <Placemark>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#t_sp">
+		<SimpleData name="Transect">17</SimpleData>
+		<SimpleData name="Subarea">Hecate Strait</SimpleData>
+	</SchemaData></ExtendedData>
+      <LineString><coordinates>-130.48917516427,53.5238447697889 -130.839536213925,53.5199694912254</coordinates></LineString>
+  </Placemark>
+  <Placemark>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#t_sp">
+		<SimpleData name="Transect">18</SimpleData>
+		<SimpleData name="Subarea">Hecate Strait</SimpleData>
+	</SchemaData></ExtendedData>
+      <LineString><coordinates>-130.846549001225,53.5248043822157 -130.540592300818,53.6194211641185</coordinates></LineString>
+  </Placemark>
+  <Placemark>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#t_sp">
+		<SimpleData name="Transect">19</SimpleData>
+		<SimpleData name="Subarea">Hecate Strait</SimpleData>
+	</SchemaData></ExtendedData>
+      <LineString><coordinates>-130.380582251721,53.72390989911 -131.075051127076,53.7077100244705</coordinates></LineString>
+  </Placemark>
+  <Placemark>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#t_sp">
+		<SimpleData name="Transect">20</SimpleData>
+		<SimpleData name="Subarea">Hecate Strait</SimpleData>
+	</SchemaData></ExtendedData>
+      <LineString><coordinates>-131.077616401872,53.7120587290427 -130.653278566597,53.8360880184031</coordinates></LineString>
+  </Placemark>
+  <Placemark>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#t_sp">
+		<SimpleData name="Transect">21</SimpleData>
+		<SimpleData name="Subarea">Hecate Strait</SimpleData>
+	</SchemaData></ExtendedData>
+      <LineString><coordinates>-130.727991920561,53.9211856686963 -131.195863900753,53.9114695978573</coordinates></LineString>
+  </Placemark>
+  <Placemark>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#t_sp">
+		<SimpleData name="Transect">22</SimpleData>
+		<SimpleData name="Subarea">Hecate Strait</SimpleData>
+	</SchemaData></ExtendedData>
+      <LineString><coordinates>-131.198557038438,53.9159875826935 -130.715236612878,54.0600520646197</coordinates></LineString>
+  </Placemark>
+  <Placemark>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#t_sp">
+		<SimpleData name="Transect">23</SimpleData>
+		<SimpleData name="Subarea">Hecate Strait</SimpleData>
+	</SchemaData></ExtendedData>
+      <LineString><coordinates>-130.744943087117,54.1245621119325 -131.317862399121,54.1150863662565</coordinates></LineString>
+  </Placemark>
+  <Placemark>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#t_sp">
+		<SimpleData name="Transect">24</SimpleData>
+		<SimpleData name="Subarea">Hecate Strait</SimpleData>
+	</SchemaData></ExtendedData>
+      <LineString><coordinates>-131.320694341878,54.119787622076 -130.794320575561,54.2800642405117</coordinates></LineString>
+  </Placemark>
+  <Placemark>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#t_sp">
+		<SimpleData name="Transect">25</SimpleData>
+		<SimpleData name="Subarea">Hecate Strait</SimpleData>
+	</SchemaData></ExtendedData>
+      <LineString><coordinates>-130.811819034269,54.3284211693159 -131.372311337173,54.3286795584248</coordinates></LineString>
+  </Placemark>
+  <Placemark>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#t_sp">
+		<SimpleData name="Transect">26</SimpleData>
+		<SimpleData name="Subarea">Hecate Strait</SimpleData>
+	</SchemaData></ExtendedData>
+      <LineString><coordinates>-131.373650050236,54.3344231107674 -130.951113402812,54.4741695025044</coordinates></LineString>
+  </Placemark>
+  <Placemark>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#t_sp">
+		<SimpleData name="Transect">27</SimpleData>
+		<SimpleData name="Subarea">Hecate Strait</SimpleData>
+	</SchemaData></ExtendedData>
+      <LineString><coordinates>-130.970376778881,54.5321646318388 -131.422459200991,54.5427281202954</coordinates></LineString>
+  </Placemark>
+  <Placemark>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#t_sp">
+		<SimpleData name="Transect">28</SimpleData>
+		<SimpleData name="Subarea">Hecate Strait</SimpleData>
+	</SchemaData></ExtendedData>
+      <LineString><coordinates>-131.424342453336,54.5507225752524 -131.094562481021,54.6971440009657</coordinates></LineString>
+  </Placemark>
+  <Placemark>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#t_sp">
+		<SimpleData name="Transect">29</SimpleData>
+		<SimpleData name="Subarea">Principe Inlet</SimpleData>
+	</SchemaData></ExtendedData>
+      <LineString><coordinates>-129.679636101498,53.2152272066076 -129.655096459367,53.2766855166469</coordinates></LineString>
+  </Placemark>
+  <Placemark>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#t_sp">
+		<SimpleData name="Transect">30</SimpleData>
+		<SimpleData name="Subarea">Principe Inlet</SimpleData>
+	</SchemaData></ExtendedData>
+      <LineString><coordinates>-129.678579427181,53.2982086119272 -129.800484676922,53.2861538850541</coordinates></LineString>
+  </Placemark>
+  <Placemark>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#t_sp">
+		<SimpleData name="Transect">31</SimpleData>
+		<SimpleData name="Subarea">Principe Inlet</SimpleData>
+	</SchemaData></ExtendedData>
+      <LineString><coordinates>-129.905496880249,53.3898563880843 -129.869019389851,53.4613303554783</coordinates></LineString>
+  </Placemark>
+  <Placemark>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#t_sp">
+		<SimpleData name="Transect">32</SimpleData>
+		<SimpleData name="Subarea">Principe Inlet</SimpleData>
+	</SchemaData></ExtendedData>
+      <LineString><coordinates>-129.933125628647,53.465541559344 -130.004267832301,53.4555868794763</coordinates></LineString>
+  </Placemark>
+  <Placemark>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#t_sp">
+		<SimpleData name="Transect">33</SimpleData>
+		<SimpleData name="Subarea">Principe Inlet</SimpleData>
+	</SchemaData></ExtendedData>
+      <LineString><coordinates>-130.171386028234,53.531222119771 -130.155521688718,53.5696233092511</coordinates></LineString>
+  </Placemark>
+  <Placemark>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#t_sp">
+		<SimpleData name="Transect">34</SimpleData>
+		<SimpleData name="Subarea">Principe Inlet</SimpleData>
+	</SchemaData></ExtendedData>
+      <LineString><coordinates>-130.267257213925,53.6037402473849 -130.338856222241,53.5957786388769</coordinates></LineString>
+  </Placemark>
+  <Placemark>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#t_sp">
+		<SimpleData name="Transect">35</SimpleData>
+		<SimpleData name="Subarea">Principe Inlet</SimpleData>
+	</SchemaData></ExtendedData>
+      <LineString><coordinates>-130.45017515876,53.6313484136234 -130.434878337662,53.6833687211842</coordinates></LineString>
+  </Placemark>
+</Folder>
+</Document></kml>

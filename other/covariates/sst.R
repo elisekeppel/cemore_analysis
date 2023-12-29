@@ -17,7 +17,7 @@ library(ncdf4)
 data("coastlineWorld")
 
 # https://downloads.psl.noaa.gov/Datasets/noaa.oisst.v2.highres/
-data_file <- "covariates/noaa/sst.mon.mean.nc"
+data_file <- "other/covariates/noaa/sst.mon.mean.nc"
 # Monthly values from 1981/09 to 2023/05
 # Spatial Coverage
 # 0.25 degree latitude x 0.25 degree longitude global grid (1440x720)
@@ -113,12 +113,12 @@ names(tmp_df02) <- c("lon","lat", time_df$name)
 
 # convert and filter lon
 tmp_df02 %<>% mutate(lon=oce::angleRemap(lon)) %>% filter(between(lon, -127, -122), between(lat, 47, 51)) 
-saveRDS(df, "covariates/sst_dataframe.rds")
+saveRDS(df, "other/covariates/sst_dataframe.rds")
 
 # create long data
 ldf <- df %>% tidyr::pivot_longer(cols=!c(lon,lat), names_to="monthyear",values_to="sst") %>% 
   mutate(year=substring(monthyear,4,7),month_abb=substring(monthyear,1,3))
-saveRDS(ldf, "covariates/sst_dataframe_long.rds")
+saveRDS(ldf, "other/covariates/sst_dataframe_long.rds")
 
 # summarise_by_seasons TODO?? Is this meaningful?
 
